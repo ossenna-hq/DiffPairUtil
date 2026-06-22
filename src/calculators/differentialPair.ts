@@ -18,6 +18,12 @@ export interface DifferentialPairEstimate {
   notes: string[];
 }
 
+export interface TraceGapPoint {
+  gapMm: number;
+  traceWidthMm: number;
+  differentialOhms: number;
+}
+
 const MILS_PER_MM = 39.3700787402;
 
 export function estimateDifferentialPair(input: DifferentialPairInput): DifferentialPairEstimate {
@@ -99,6 +105,49 @@ export function differentialImpedanceOhms(
 
 export function mmToMils(valueMm: number): number {
   return valueMm * MILS_PER_MM;
+}
+
+export function estimateTraceWidthForDifferentialGap(
+  targetDifferentialOhms: number,
+  gapMm: number,
+  dielectricHeightMm: number,
+  dielectricConstant: number,
+): TraceGapPoint {
+  validatePositive("target differential impedance", targetDifferentialOhms);
+  validatePositive("gap", gapMm);
+  validatePositive("dielectric height", dielectricHeightMm);
+
+  if (dielectricConstant <= 1) {
+    throw new Error("Dielectric constant must be greater than 1.");
+  }
+
+  let low = dielectricHeightMm * 0.02;
+  let high = dielectricHeightMm * 20;
+
+  for (let iteration = 0; iteration < 80; iteration += 1) {
+    const mid = (low + high) / 2;
+    const singleEndedOhms = microstripImpedanceOhms(mid, dielectricHeightMm, dielectricConstant);
+    const differentialOhms = differentialImpedanceOhms(singleEndedOhms, gapMm, dielectricHeightMm);
+
+    if (differentialOhms > targetDifferentialOhms) {
+      low = mid;
+    } else {
+      high = mid;
+    }
+  }
+
+  const traceWidthMm = (low + high) / 2;
+  const differentialOhms = differentialImpedanceOhms(
+    microstripImpedanceOhms(traceWidthMm, dielectricHeightMm, dielectricConstant),
+    gapMm,
+    dielectricHeightMm,
+  );
+
+  return {
+    gapMm,
+    traceWidthMm,
+    differentialOhms,
+  };
 }
 
 function effectiveDielectricConstant(
@@ -183,11 +232,17 @@ function validateInput(input: DifferentialPairInput): void {
 
   for (const [label, value] of checks) {
     if (!Number.isFinite(value) || value <= 0) {
-      throw new Error(`${label} must be a positive finite number.`);
+      validatePositive(label, value);
     }
   }
 
   if (input.dielectricConstant <= 1) {
     throw new Error("Dielectric constant must be greater than 1.");
+  }
+}
+
+function validatePositive(label: string, value: number): void {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${label} must be a positive finite number.`);
   }
 }

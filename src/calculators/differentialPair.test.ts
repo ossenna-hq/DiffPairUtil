@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   differentialImpedanceOhms,
   estimateDifferentialPair,
+  estimateTraceWidthForDifferentialGap,
   microstripImpedanceOhms,
   mmToMils,
 } from "./differentialPair";
@@ -40,5 +41,14 @@ describe("differential pair estimator", () => {
 
   it("converts millimeters to mils", () => {
     expect(mmToMils(1)).toBeCloseTo(39.3701, 4);
+  });
+
+  it("estimates trace width for a fixed differential gap", () => {
+    const point = estimateTraceWidthForDifferentialGap(90, 0.25, 0.18, 4.2);
+
+    expect(point.gapMm).toBe(0.25);
+    expect(point.traceWidthMm).toBeGreaterThan(0.2);
+    expect(point.traceWidthMm).toBeLessThan(0.6);
+    expect(point.differentialOhms).toBeCloseTo(90, 1);
   });
 });

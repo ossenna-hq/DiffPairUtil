@@ -1,12 +1,11 @@
 {
   "name": "diff-pair-util",
-  "build": {
-    "dockerfile": "Dockerfile"
-  },
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
   "customizations": {
     "vscode": {
       "extensions": [
         "dbaeumer.vscode-eslint",
+        "openai.chatgpt",
         "esbenp.prettier-vscode",
         "streetsidesoftware.code-spell-checker"
       ],
@@ -17,6 +16,9 @@
     }
   },
   "forwardPorts": [5173],
-  "postCreateCommand": "npm install",
+  "mounts": [
+    "source=${localWorkspaceFolderBasename}-node_modules,target=${containerWorkspaceFolder}/node_modules,type=volume"
+  ],
+  "postCreateCommand": "sudo chown node:node node_modules && npm ci",
   "remoteUser": "node"
 }
