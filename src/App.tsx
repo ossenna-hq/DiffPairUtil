@@ -1,8 +1,10 @@
 import { useMemo, useState, type MouseEvent } from "react";
 import {
+  estimateConstrainedDifferentialPair,
   estimateDifferentialPair,
   estimateTraceWidthForDifferentialGap,
   mmToMils,
+  type DimensionLocks,
   type DifferentialPairInput,
   type TraceGapPoint,
 } from "./calculators/differentialPair";
@@ -11,10 +13,8 @@ import "./App.css";
 type CouplingMode = "coplanar" | "non-coplanar";
 type SignalMode = "differential" | "single-ended";
 type SolderMaskMode = "with-mask" | "without-mask";
-type ThicknessUnit = "oz" | "um";
 
 interface ThicknessControl {
-  unit: ThicknessUnit;
   ounces: "0.5" | "1";
   microns: number;
 }
@@ -25,10 +25,16 @@ interface ImpedanceConfiguration {
   solderMask: SolderMaskMode;
 }
 
+interface ManualDimensions {
+  dielectricHeightMm: number;
+  traceWidthMm: number;
+  gapMm: number;
+}
+
 const initialInput: DifferentialPairInput = {
   dielectricHeightMm: 0.18,
   dielectricConstant: 4.2,
-  copperThicknessUm: 35,
+  copperThicknessUm: ouncesToMicrons("1"),
   targetDifferentialOhms: 90,
   targetSingleEndedOhms: 50,
   geometry: "microstrip",
@@ -41,9 +47,28 @@ const initialConfiguration: ImpedanceConfiguration = {
 };
 
 const initialThickness: ThicknessControl = {
-  unit: "oz",
   ounces: "1",
-  microns: 35,
+  microns: ouncesToMicrons("1"),
+};
+
+const initialEstimate = estimateDifferentialPair(initialInput);
+
+const initialManualDimensions: ManualDimensions = {
+  dielectricHeightMm: initialInput.dielectricHeightMm,
+  traceWidthMm: initialEstimate.traceWidthMm,
+  gapMm: initialEstimate.gapMm,
+};
+
+const initialDimensionLocks: DimensionLocks = {
+  dielectricHeight: false,
+  traceWidth: false,
+  gap: false,
+};
+
+const initialManualDimensionHolds: DimensionLocks = {
+  dielectricHeight: false,
+  traceWidth: false,
+  gap: false,
 };
 
 function App() {
@@ -51,23 +76,45 @@ function App() {
   const [configuration, setConfiguration] = useState<ImpedanceConfiguration>(initialConfiguration);
   const [signalThickness, setSignalThickness] = useState<ThicknessControl>(initialThickness);
   const [planeThickness, setPlaneThickness] = useState<ThicknessControl>(initialThickness);
+  const [manualDimensions, setManualDimensions] =
+    useState<ManualDimensions>(initialManualDimensions);
+  const [dimensionLocks, setDimensionLocks] = useState<DimensionLocks>(initialDimensionLocks);
+  const [manualDimensionHolds, setManualDimensionHolds] = useState(initialManualDimensionHolds);
   const [tolerancePercent, setTolerancePercent] = useState(8);
 
   const estimate = useMemo(() => {
+    const solverLocks = {
+      dielectricHeight: dimensionLocks.dielectricHeight || manualDimensionHolds.dielectricHeight,
+      traceWidth: dimensionLocks.traceWidth || manualDimensionHolds.traceWidth,
+      gap: dimensionLocks.gap || manualDimensionHolds.gap,
+    };
+
     try {
-      return { value: estimateDifferentialPair(input), error: null };
+      return {
+        value: estimateConstrainedDifferentialPair({
+          ...input,
+          dielectricHeightMm: manualDimensions.dielectricHeightMm,
+          traceWidthMm: manualDimensions.traceWidthMm,
+          gapMm: manualDimensions.gapMm,
+          locks: solverLocks,
+        }),
+        error: null,
+      };
     } catch (error) {
       return { value: null, error: error instanceof Error ? error.message : "Invalid inputs." };
     }
-  }, [input]);
+  }, [dimensionLocks, input, manualDimensionHolds, manualDimensions]);
 
   const traceGapSeries = useMemo(() => {
     if (configuration.signal !== "differential") {
       return [];
     }
 
-    return createTraceGapSeries(input);
-  }, [configuration.signal, input]);
+    return createTraceGapSeries({
+      ...input,
+      dielectricHeightMm: estimate.value?.dielectricHeightMm ?? manualDimensions.dielectricHeightMm,
+    });
+  }, [configuration.signal, estimate.value?.dielectricHeightMm, input, manualDimensions.dielectricHeightMm]);
 
   function updateNumber(field: keyof DifferentialPairInput, value: string) {
     setInput((current) => ({
@@ -76,18 +123,83 @@ function App() {
     }));
   }
 
-  function updateSignalThickness(next: ThicknessControl) {
-    const microns = thicknessToMicrons(next);
-    setSignalThickness({ ...next, microns });
+  function updateDielectricHeight(nextHeightMm: number) {
+    const dielectricHeightMm = clamp(nextHeightMm, 0.05, 0.6);
+    setManualDimensionHolds((current) => ({
+      ...current,
+      dielectricHeight: true,
+    }));
+    setManualDimensions((current) => ({
+      ...current,
+      dielectricHeightMm,
+    }));
+  }
+
+  function updateTraceWidth(nextTraceWidthMm: number) {
+    setManualDimensionHolds((current) => ({
+      ...current,
+      traceWidth: true,
+    }));
+    setManualDimensions((current) => ({
+      ...current,
+      traceWidthMm: Math.max(0.001, nextTraceWidthMm),
+    }));
+  }
+
+  function updateGap(nextGapMm: number) {
+    setManualDimensionHolds((current) => ({
+      ...current,
+      gap: true,
+    }));
+    setManualDimensions((current) => ({
+      ...current,
+      gapMm: Math.max(0.001, nextGapMm),
+    }));
+  }
+
+  function toggleDimensionLock(dimension: keyof DimensionLocks, solvedValueMm: number | null) {
+    setDimensionLocks((current) => {
+      const nextLocked = !current[dimension];
+      if (nextLocked && solvedValueMm !== null) {
+        setManualDimensions((manual) => ({
+          ...manual,
+          [dimension === "dielectricHeight"
+            ? "dielectricHeightMm"
+            : dimension === "traceWidth"
+              ? "traceWidthMm"
+              : "gapMm"]: solvedValueMm,
+        }));
+      }
+
+      return {
+        ...current,
+        [dimension]: nextLocked,
+      };
+    });
+
+    setManualDimensionHolds((current) => ({
+      ...current,
+      [dimension]: false,
+    }));
+  }
+
+  function updateSignalThickness(ounces: ThicknessControl["ounces"]) {
+    const microns = ouncesToMicrons(ounces);
+    setSignalThickness({ ounces, microns });
     setInput((current) => ({
       ...current,
       copperThicknessUm: microns,
     }));
   }
 
-  function updatePlaneThickness(next: ThicknessControl) {
-    setPlaneThickness({ ...next, microns: thicknessToMicrons(next) });
+  function updatePlaneThickness(ounces: ThicknessControl["ounces"]) {
+    setPlaneThickness({ ounces, microns: ouncesToMicrons(ounces) });
   }
+
+  const solvedDielectricHeightMm =
+    estimate.value?.dielectricHeightMm ?? manualDimensions.dielectricHeightMm;
+  const solvedTraceWidthMm = estimate.value?.traceWidthMm ?? manualDimensions.traceWidthMm;
+  const solvedGapMm = estimate.value?.gapMm ?? manualDimensions.gapMm;
 
   return (
     <main className="shell">
@@ -103,27 +215,146 @@ function App() {
 
         <div className="layout-grid">
           <form className="panel visual-panel primary-panel">
-            <div className="panel-heading">
-              <h2>Cross Section</h2>
+            <div className="target-controls" aria-label="Impedance targets">
+              <h2>Target:</h2>
+              <label>
+                Single-ended
+                <span className="field-unit">ohms</span>
+                <input
+                  min="20"
+                  step="1"
+                  type="number"
+                  value={input.targetSingleEndedOhms}
+                  onChange={(event) => updateNumber("targetSingleEndedOhms", event.target.value)}
+                />
+              </label>
+
+              <label className="target-check">
+                <input
+                  checked={configuration.signal === "differential"}
+                  type="checkbox"
+                  onChange={(event) =>
+                    setConfiguration((current) => ({
+                      ...current,
+                      signal: event.target.checked ? "differential" : "single-ended",
+                    }))
+                  }
+                />
+                Differential
+              </label>
+
+              <label className="target-value">
+                <span className="field-unit">ohms</span>
+                <input
+                  disabled={configuration.signal === "single-ended"}
+                  min="40"
+                  step="1"
+                  type="number"
+                  value={input.targetDifferentialOhms}
+                  onChange={(event) => updateNumber("targetDifferentialOhms", event.target.value)}
+                />
+              </label>
+
+              <h2>Calculated:</h2>
+              <label className="target-calculated">
+                Single-ended
+                <span className="field-unit">ohms</span>
+                <input
+                  readOnly
+                  type="number"
+                  value={estimate.value ? estimate.value.singleEndedOhms.toFixed(1) : ""}
+                />
+              </label>
+
+              <div className="target-row-spacer" aria-hidden="true" />
+
+              <label className="target-value target-calculated">
+                <span className="field-unit">ohms</span>
+                <input
+                  readOnly
+                  type="number"
+                  value={estimate.value ? estimate.value.differentialOhms.toFixed(1) : ""}
+                />
+              </label>
+            </div>
+
+            <div className="section-heading">
+              <h2>Cross Section:</h2>
               <span>{configuration.coupling === "coplanar" ? "Coplanar" : "Microstrip"}</span>
             </div>
 
             <div className="cross-section-workbench">
-              <div className="geometry-frame">
-                <div className="graphic-toggles" aria-label="Cross section options">
-                  <label className="check-control">
+              <aside className="stack-controls" aria-label="Stackup controls">
+                <ThicknessField
+                  label="Signal:"
+                  value={signalThickness}
+                  onChange={updateSignalThickness}
+                />
+
+                <div className="stack-divider" />
+
+                <section className="dielectric-controls" aria-label="Dielectric controls">
+                  <h3>Dielectric:</h3>
+                  <label className="dk-row">
+                    Dk:
                     <input
-                      checked={configuration.signal === "differential"}
-                      type="checkbox"
-                      onChange={(event) =>
-                        setConfiguration((current) => ({
-                          ...current,
-                          signal: event.target.checked ? "differential" : "single-ended",
-                        }))
+                      min="1.01"
+                      step="0.05"
+                      type="number"
+                      value={input.dielectricConstant}
+                      onChange={(event) => updateNumber("dielectricConstant", event.target.value)}
+                    />
+                  </label>
+                  <div className="thickness-control-grid">
+                    <LockButton
+                      locked={dimensionLocks.dielectricHeight}
+                      label="dielectric thickness"
+                      onClick={() =>
+                        toggleDimensionLock("dielectricHeight", solvedDielectricHeightMm)
                       }
                     />
-                    Differential
-                  </label>
+                    <div className="dual-units" aria-label="Dielectric thickness">
+                      <label>
+                        <span>mm</span>
+                        <input
+                          disabled={dimensionLocks.dielectricHeight}
+                          min="0.05"
+                          max="0.6"
+                          step="0.001"
+                          type="number"
+                          value={solvedDielectricHeightMm.toFixed(3)}
+                          onChange={(event) => updateDielectricHeight(Number(event.target.value))}
+                        />
+                      </label>
+                      <label>
+                        <span>mil</span>
+                        <input
+                          disabled={dimensionLocks.dielectricHeight}
+                          min="2"
+                          max="24"
+                          step="0.1"
+                          type="number"
+                          value={mmToMils(solvedDielectricHeightMm).toFixed(1)}
+                          onChange={(event) =>
+                            updateDielectricHeight(Number(event.target.value) / mmToMils(1))
+                          }
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </section>
+
+                <div className="stack-divider" />
+
+                <ThicknessField
+                  label="Plane:"
+                  value={planeThickness}
+                  onChange={updatePlaneThickness}
+                />
+              </aside>
+
+              <div className="geometry-frame">
+                <div className="graphic-toggles" aria-label="Cross section options">
                   <label className="check-control">
                     <input
                       checked={configuration.coupling === "coplanar"}
@@ -151,88 +382,51 @@ function App() {
                     Mask
                   </label>
                 </div>
+                <div className="vertical-stepper visual-thickness-stepper">
+                  <button
+                    aria-label="Decrease dielectric thickness"
+                    disabled={dimensionLocks.dielectricHeight}
+                    type="button"
+                    onClick={() => updateDielectricHeight(solvedDielectricHeightMm - 0.01)}
+                  >
+                    -
+                  </button>
+                  <input
+                    aria-label="Dielectric thickness"
+                    className="vertical-slider"
+                    min="0.05"
+                    max="0.6"
+                    step="0.01"
+                    type="range"
+                    disabled={dimensionLocks.dielectricHeight}
+                    value={solvedDielectricHeightMm}
+                    onChange={(event) => updateDielectricHeight(Number(event.target.value))}
+                  />
+                  <button
+                    aria-label="Increase dielectric thickness"
+                    disabled={dimensionLocks.dielectricHeight}
+                    type="button"
+                    onClick={() => updateDielectricHeight(solvedDielectricHeightMm + 0.01)}
+                  >
+                    +
+                  </button>
+                </div>
                 <GeometryGraphic
                   configuration={configuration}
                   estimate={estimate.value}
-                  dielectricHeightMm={input.dielectricHeightMm}
+                  dielectricHeightMm={solvedDielectricHeightMm}
                   planeThicknessUm={planeThickness.microns}
                   signalThicknessUm={signalThickness.microns}
                 />
-              </div>
-
-              <div className="surface-controls material-controls">
-                <div className="input-row">
-                  <label>
-                    Prepreg / core
-                    <span className="field-unit">{formatMmMil(input.dielectricHeightMm)}</span>
-                    <input
-                      min="0.05"
-                      max="0.6"
-                      step="0.01"
-                      type="range"
-                      value={input.dielectricHeightMm}
-                      onChange={(event) => updateNumber("dielectricHeightMm", event.target.value)}
-                    />
-                  </label>
-
-                  <label>
-                    Dk
-                    <span className="field-unit">dielectric constant</span>
-                    <input
-                      min="1.01"
-                      step="0.05"
-                      type="number"
-                      value={input.dielectricConstant}
-                      onChange={(event) => updateNumber("dielectricConstant", event.target.value)}
-                    />
-                  </label>
-                </div>
-              </div>
-
-              <div className="surface-controls copper-controls">
-                <div className="input-row">
-                  <ThicknessField
-                    label="Signal copper"
-                    value={signalThickness}
-                    onChange={updateSignalThickness}
-                  />
-                  <ThicknessField
-                    label="Plane copper"
-                    value={planeThickness}
-                    onChange={updatePlaneThickness}
-                  />
-                </div>
-
-                <div className="input-row">
-                  <label>
-                    Single-ended target
-                    <span className="field-unit">ohms</span>
-                    <input
-                      min="20"
-                      step="1"
-                      type="number"
-                      value={input.targetSingleEndedOhms}
-                      onChange={(event) =>
-                        updateNumber("targetSingleEndedOhms", event.target.value)
-                      }
-                    />
-                  </label>
-
-                  <label>
-                    Differential target
-                    <span className="field-unit">ohms</span>
-                    <input
-                      disabled={configuration.signal === "single-ended"}
-                      min="40"
-                      step="1"
-                      type="number"
-                      value={input.targetDifferentialOhms}
-                      onChange={(event) =>
-                        updateNumber("targetDifferentialOhms", event.target.value)
-                      }
-                    />
-                  </label>
-                </div>
+                <GeometryReadouts
+                  estimate={estimate.value}
+                  locks={dimensionLocks}
+                  signal={configuration.signal}
+                  onGapChange={updateGap}
+                  onGapLockToggle={() => toggleDimensionLock("gap", solvedGapMm)}
+                  onTraceLockToggle={() => toggleDimensionLock("traceWidth", solvedTraceWidthMm)}
+                  onTraceWidthChange={updateTraceWidth}
+                />
               </div>
             </div>
           </form>
@@ -324,68 +518,159 @@ function App() {
   );
 }
 
-interface SegmentButtonProps {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}
-
-function SegmentButton({ active, label, onClick }: SegmentButtonProps) {
-  return (
-    <button
-      aria-pressed={active}
-      className={active ? "segment active" : "segment"}
-      type="button"
-      onClick={onClick}
-    >
-      {label}
-    </button>
-  );
-}
-
 interface ThicknessFieldProps {
   label: string;
   value: ThicknessControl;
-  onChange: (value: ThicknessControl) => void;
+  onChange: (value: ThicknessControl["ounces"]) => void;
 }
 
 function ThicknessField({ label, value, onChange }: ThicknessFieldProps) {
   return (
     <fieldset className="thickness-field">
       <legend>{label}</legend>
-      <span className="field-unit">{formatMicronMil(value.microns)}</span>
-      <div className="segmented compact">
-        <SegmentButton
-          active={value.unit === "oz"}
-          label="Copper oz"
-          onClick={() => onChange({ ...value, unit: "oz" })}
-        />
-        <SegmentButton
-          active={value.unit === "um"}
-          label="Microns"
-          onClick={() => onChange({ ...value, unit: "um" })}
-        />
-      </div>
-      {value.unit === "oz" ? (
-        <select
-          value={value.ounces}
-          onChange={(event) =>
-            onChange({ ...value, ounces: event.target.value as ThicknessControl["ounces"] })
-          }
-        >
-          <option value="0.5">0.5 oz copper</option>
-          <option value="1">1 oz copper</option>
-        </select>
-      ) : (
-        <input
-          min="1"
-          step="1"
-          type="number"
-          value={value.microns}
-          onChange={(event) => onChange({ ...value, microns: Number(event.target.value) })}
-        />
-      )}
+      <select
+        value={value.ounces}
+        onChange={(event) => onChange(event.target.value as ThicknessControl["ounces"])}
+      >
+        <option value="0.5">0.5 oz / 0.7mil / 17um</option>
+        <option value="1">1 oz / 1.4mil / 35um</option>
+      </select>
     </fieldset>
+  );
+}
+
+interface GeometryReadoutsProps {
+  estimate: ReturnType<typeof estimateDifferentialPair> | null;
+  locks: DimensionLocks;
+  signal: SignalMode;
+  onGapChange: (valueMm: number) => void;
+  onGapLockToggle: () => void;
+  onTraceLockToggle: () => void;
+  onTraceWidthChange: (valueMm: number) => void;
+}
+
+function GeometryReadouts({
+  estimate,
+  locks,
+  signal,
+  onGapChange,
+  onGapLockToggle,
+  onTraceLockToggle,
+  onTraceWidthChange,
+}: GeometryReadoutsProps) {
+  const gapMm = signal === "differential" && estimate ? estimate.gapMm : null;
+  const trackMm = estimate?.traceWidthMm ?? null;
+
+  return (
+    <div className="dimension-rail" aria-label="Track and gap controls">
+      <DimensionReadout
+        className="track-readout"
+        label="Track:"
+        locked={locks.traceWidth}
+        valueMm={trackMm}
+        onChange={onTraceWidthChange}
+        onLockToggle={onTraceLockToggle}
+      />
+      <DimensionReadout
+        className="gap-readout"
+        label="Gap:"
+        locked={locks.gap}
+        valueMm={gapMm}
+        onChange={onGapChange}
+        onLockToggle={onGapLockToggle}
+      />
+    </div>
+  );
+}
+
+interface DimensionReadoutProps {
+  className: string;
+  label: string;
+  locked: boolean;
+  valueMm: number | null;
+  onChange: (valueMm: number) => void;
+  onLockToggle: () => void;
+}
+
+function DimensionReadout({
+  className,
+  label,
+  locked,
+  valueMm,
+  onChange,
+  onLockToggle,
+}: DimensionReadoutProps) {
+  return (
+    <div className={`dimension-readout ${className}`}>
+      <h3>{label}</h3>
+      <div className="dimension-body">
+        <LockButton locked={locked} label={label.replace(":", "").toLowerCase()} onClick={onLockToggle} />
+        <div className="dual-units">
+          <label>
+            <span>mm</span>
+            <input
+              disabled={locked || valueMm === null}
+              min="0.001"
+              step="0.001"
+              type="number"
+              value={valueMm === null ? "" : valueMm.toFixed(3)}
+              onChange={(event) => onChange(Number(event.target.value))}
+            />
+          </label>
+          <label>
+            <span>mil</span>
+            <input
+              disabled={locked || valueMm === null}
+              min="0.1"
+              step="0.1"
+              type="number"
+              value={valueMm === null ? "" : mmToMils(valueMm).toFixed(1)}
+              onChange={(event) => onChange(Number(event.target.value) / mmToMils(1))}
+            />
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface LockButtonProps {
+  label: string;
+  locked: boolean;
+  onClick: () => void;
+}
+
+function LockButton({ label, locked, onClick }: LockButtonProps) {
+  return (
+    <button
+      aria-label={`${locked ? "Unlock" : "Lock"} ${label}`}
+      aria-pressed={locked}
+      className={locked ? "lock-button locked" : "lock-button unlocked"}
+      type="button"
+      onClick={onClick}
+    >
+      <svg aria-hidden="true" className="lock-icon-svg" viewBox="0 0 48 48">
+        {locked ? (
+          <path
+            d="M15 21v-5a9 9 0 0 1 18 0v5M13 21h22a3 3 0 0 1 3 3v15a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3V24a3 3 0 0 1 3-3Zm11 8v6"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="4"
+          />
+        ) : (
+          <path
+            d="M31 19v-3a9 9 0 0 0-17-4M13 21h22a3 3 0 0 1 3 3v15a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3V24a3 3 0 0 1 3-3Zm11 8v6"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="4"
+          />
+        )}
+      </svg>
+    </button>
   );
 }
 
@@ -426,9 +711,9 @@ function GeometryGraphic({
   const hasMask = configuration.solderMask === "with-mask";
   const isDifferential = configuration.signal === "differential";
   const isCoplanar = configuration.coupling === "coplanar";
-  const boardBottomY = 330;
-  const dielectricVisualHeight = scale(dielectricHeightMm, 0.05, 0.6, 72, 182);
-  const surfaceY = boardBottomY - dielectricVisualHeight;
+  const surfaceY = 206;
+  const dielectricVisualHeight = scale(clamp(dielectricHeightMm, 0.05, 0.6), 0.05, 0.6, 72, 182);
+  const boardBottomY = surfaceY + dielectricVisualHeight;
   const leftTraceX = 380 - traceWidth - gapWidth / 2;
   const rightTraceX = 380 + gapWidth / 2;
   const singleTraceX = 380 - traceWidth / 2;
@@ -694,12 +979,8 @@ function createTraceGapSeries(input: DifferentialPairInput): TraceGapPoint[] {
   return points;
 }
 
-function thicknessToMicrons(thickness: ThicknessControl): number {
-  if (thickness.unit === "oz") {
-    return Number(thickness.ounces) * 34.8;
-  }
-
-  return thickness.microns;
+function ouncesToMicrons(ounces: ThicknessControl["ounces"]): number {
+  return Number(ounces) * 34.8;
 }
 
 function micronsToOunces(microns: number): number {
