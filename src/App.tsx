@@ -1006,6 +1006,10 @@ function TraceGapChart({
   const plotRight = width - 46;
   const plotTop = 46;
   const plotBottom = height - 66;
+  const tooltipWidth = 170;
+  const tooltipHeight = tolerancePercent > 0 ? 66 : 48;
+  const tooltipX = plotRight - tooltipWidth - 12;
+  const tooltipY = plotTop + 12;
   const gapValues = [
     ...points.map((point) => point.gapMm),
     ...(currentPoint ? [currentPoint.gapMm] : []),
@@ -1254,13 +1258,11 @@ function TraceGapChart({
           </circle>
         ) : null}
         {hoveredPoint && activeX !== null && activeY !== null ? (
-          <g
-            transform={`translate(${Math.min(activeX + 14, width - 190)} ${Math.max(activeY - 58, 18)})`}
-          >
+          <g transform={`translate(${tooltipX} ${tooltipY})`}>
             <rect
               className="chart-tooltip"
-              width="170"
-              height={tolerancePercent > 0 ? "66" : "48"}
+              width={tooltipWidth}
+              height={tooltipHeight}
               rx="7"
             />
             <text className="chart-tooltip-text" x="10" y="19">
