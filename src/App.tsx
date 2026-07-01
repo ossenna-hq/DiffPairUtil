@@ -1259,22 +1259,31 @@ function TraceGapChart({
           y={height - 12}
           textAnchor="middle"
         >
-          Gap between traces (mm / mil)
+          Gap between traces
         </text>
         <text
           className="chart-label"
           textAnchor="middle"
           transform={`translate(18 ${height / 2}) rotate(-90)`}
         >
-          Trace width (mm / mil)
+          Trace width
         </text>
       </svg>
+      <p className="chart-unit-note">Units are mil (mm)</p>
       <div className="chart-hover-readout" aria-live="polite">
         {hoveredPoint ? (
           <>
-            <span>gap {formatMmMil(hoveredPoint.gapMm)}</span>
-            <span>width {formatMmMil(hoveredPoint.traceWidthMm)}</span>
-            <span>band +/- {tolerancePercent}%</span>
+            <span>
+              <strong>Track: </strong>
+              {formatMilMm(hoveredPoint.traceWidthMm)}
+            </span>
+            <span>
+              <strong>Gap: </strong>
+              {formatMilMm(hoveredPoint.gapMm)}
+            </span>
+            <span>
+              <strong>Band: </strong>+/-{tolerancePercent}%
+            </span>
           </>
         ) : (
           <span>No point selected</span>
@@ -1379,6 +1388,10 @@ function micronsToOunces(microns: number): number {
 
 function formatMmMil(valueMm: number): string {
   return `${valueMm.toFixed(3)} mm / ${mmToMils(valueMm).toFixed(1)} mil`;
+}
+
+function formatMilMm(valueMm: number): string {
+  return `${mmToMils(valueMm).toFixed(1)} (${valueMm.toFixed(3)})`;
 }
 
 function formatMicronMil(valueMicrons: number): string {

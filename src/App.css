@@ -792,10 +792,21 @@ input:disabled {
   padding: 7px 9px;
 }
 
+.chart-unit-note {
+  margin: -2px 0 0;
+  color: #51615a;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
 .chart-hover-readout span {
   color: inherit;
   font-size: 0.8rem;
   font-weight: 800;
+}
+
+.chart-hover-readout strong {
+  font-weight: 900;
 }
 
 .tolerance-control {
