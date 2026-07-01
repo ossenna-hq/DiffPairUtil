@@ -15,5 +15,6 @@
 ## Hosting
 
 - GitHub Actions builds the app and deploys the `dist/` artifact to GitHub Pages.
-- `public/CNAME` configures the custom domain as `www.ossenna.com`.
-- DNS should map `www.ossenna.com` to the GitHub Pages host for the repository owner.
+- Production builds use the `/DiffPairUtil/` base path required by the default GitHub Pages project-site URL.
+- No custom domain or `CNAME` file is used in the current deployment model because `www.ossenna.com` remains the main website domain.
+- To host from an Ossenna domain later, use a dedicated subdomain for this tool or route it through the main website, then update `vite.config.ts`, DNS, and the Pages custom domain together.

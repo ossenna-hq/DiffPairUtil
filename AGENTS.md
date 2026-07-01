@@ -79,6 +79,7 @@ Default section order:
 When the user requests a durable behavior change, record it here or in the relevant child AGENTS.md
 
 - Project should be maintained with infrastructure-as-code practices: development environment, CI, deployment, domain configuration, and quality checks are versioned in the repository.
+- Use the default GitHub Pages project-site deployment unless a custom domain is explicitly requested.
 
 ## Child DOX Index
 

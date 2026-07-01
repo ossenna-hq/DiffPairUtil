@@ -19,7 +19,7 @@
 - User can see the assumptions and approximation limits that apply to the estimate.
 - User can use manual material inputs only in the initial version.
 - User can read linear measurements with metric and imperial values shown together in millimeters and mils.
-- User can use the app as a static webpage hosted at `www.ossenna.com`.
+- User can use the app as a static webpage hosted by the default GitHub Pages project-site process.
 
 ## Initial Scope
 

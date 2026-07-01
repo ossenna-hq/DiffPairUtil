@@ -31,6 +31,9 @@ npm run build
 
 ## Deployment
 
-GitHub Actions deploys `dist/` to GitHub Pages on pushes to `main`. The custom domain is set by `public/CNAME` as `www.ossenna.com`.
+GitHub Actions deploys `dist/` to GitHub Pages on pushes to `main`.
 
-Configure DNS with your domain provider so `www.ossenna.com` points to the GitHub Pages host for the repository owner.
+The app is configured for the default GitHub Pages project-site URL:
+`https://ossenna-hq.github.io/DiffPairUtil/`.
+
+This repository does not claim `www.ossenna.com`; that host remains reserved for the main website.
