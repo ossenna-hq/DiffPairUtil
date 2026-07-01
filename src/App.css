@@ -732,15 +732,24 @@ input:disabled {
   cursor: pointer;
 }
 
+.chart-hit-dot {
+  fill: transparent;
+  stroke: transparent;
+  cursor: pointer;
+  pointer-events: all;
+}
+
 .chart-active-dot {
   fill: #17382e;
   stroke: #ffffff;
   stroke-width: 2;
+  pointer-events: none;
 }
 
 .chart-current-dot {
   stroke: #ffffff;
   stroke-width: 3;
+  pointer-events: none;
 }
 
 .chart-current-dot.within {
@@ -755,6 +764,7 @@ input:disabled {
   stroke: #244b60;
   stroke-dasharray: 4 5;
   stroke-width: 1.4;
+  pointer-events: none;
 }
 
 .chart-label,
@@ -772,12 +782,14 @@ input:disabled {
 .chart-tooltip {
   fill: #17382e;
   filter: drop-shadow(0 8px 14px rgb(20 30 26 / 22%));
+  pointer-events: none;
 }
 
 .chart-tooltip-text {
   fill: #ffffff;
   font-size: 13px;
   font-weight: 800;
+  pointer-events: none;
 }
 
 .chart-tooltip-text.subtle {

@@ -31,6 +31,12 @@ interface ManualDimensions {
   gapMm: number;
 }
 
+interface TraceGapSeries {
+  points: TraceGapPoint[];
+  lowerBand: TraceGapPoint[];
+  upperBand: TraceGapPoint[];
+}
+
 const initialInput: DifferentialPairInput = {
   dielectricHeightMm: 0.18,
   dielectricConstant: 4.2,
@@ -231,7 +237,7 @@ function App() {
   );
   const traceGapSeries = useMemo(() => {
     if (configuration.signal !== "differential") {
-      return [];
+      return { points: [], lowerBand: [], upperBand: [] };
     }
 
     return createTraceGapSeries(
@@ -242,6 +248,7 @@ function App() {
           manualDimensions.dielectricHeightMm,
       },
       estimate.value?.gapMm ?? manualDimensions.gapMm,
+      tolerancePercent,
     );
   }, [
     configuration.signal,
@@ -250,6 +257,7 @@ function App() {
     input,
     manualDimensions.dielectricHeightMm,
     manualDimensions.gapMm,
+    tolerancePercent,
   ]);
 
   return (
@@ -628,9 +636,11 @@ function App() {
               <TraceGapChart
                 currentPoint={estimate.value}
                 onPointSelect={updateTraceGap}
-                points={traceGapSeries}
+                lowerBand={traceGapSeries.lowerBand}
+                points={traceGapSeries.points}
                 targetOhms={input.targetDifferentialOhms}
                 tolerancePercent={tolerancePercent}
+                upperBand={traceGapSeries.upperBand}
               />
             ) : (
               <div className="empty-state">
@@ -963,18 +973,22 @@ function GeometryGraphic({
 
 interface TraceGapChartProps {
   currentPoint: ReturnType<typeof estimateDifferentialPair> | null;
+  lowerBand: TraceGapPoint[];
   onPointSelect: (traceWidthMm: number, gapMm: number) => void;
   points: TraceGapPoint[];
   targetOhms: number;
   tolerancePercent: number;
+  upperBand: TraceGapPoint[];
 }
 
 function TraceGapChart({
   currentPoint,
+  lowerBand,
   onPointSelect,
   points,
   targetOhms,
   tolerancePercent,
+  upperBand,
 }: TraceGapChartProps) {
   const [hoveredPoint, setHoveredPoint] = useState<TraceGapPoint | null>(null);
 
@@ -998,15 +1012,8 @@ function TraceGapChart({
   ];
   const minGap = Math.min(...gapValues);
   const maxGap = Math.max(...gapValues);
-  const toleranceRatio = tolerancePercent / 100;
-  const lowerBand = points.map((point) => ({
-    ...point,
-    traceWidthMm: point.traceWidthMm * (1 - toleranceRatio),
-  }));
-  const upperBand = points.map((point) => ({
-    ...point,
-    traceWidthMm: point.traceWidthMm * (1 + toleranceRatio),
-  }));
+  const hasToleranceBand =
+    tolerancePercent > 0 && lowerBand.length > 1 && upperBand.length > 1;
   const traceValues = [...lowerBand, ...points, ...upperBand].map(
     (point) => point.traceWidthMm,
   );
@@ -1044,7 +1051,7 @@ function TraceGapChart({
       return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
     })
     .join(" ");
-  const upperPath = upperBand
+  const upperPath = lowerBand
     .map((point, index) => {
       const x = scale(point.gapMm, minGap, maxGap, plotLeft, plotRight);
       const y = scale(
@@ -1057,7 +1064,7 @@ function TraceGapChart({
       return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
     })
     .join(" ");
-  const lowerPath = lowerBand
+  const lowerPath = upperBand
     .map((point) => {
       const x = scale(point.gapMm, minGap, maxGap, plotLeft, plotRight);
       const y = scale(
@@ -1071,7 +1078,7 @@ function TraceGapChart({
     })
     .reverse()
     .join(" ");
-  const bandPath = `${upperPath} ${lowerPath} Z`;
+  const bandPath = hasToleranceBand ? `${upperPath} ${lowerPath} Z` : "";
   const activeX = hoveredPoint
     ? scale(hoveredPoint.gapMm, minGap, maxGap, plotLeft, plotRight)
     : null;
@@ -1161,9 +1168,7 @@ function TraceGapChart({
         >
           {formatMmMil(maxTrace)}
         </text>
-        {tolerancePercent > 0 ? (
-          <path className="chart-band" d={bandPath} />
-        ) : null}
+        {hasToleranceBand ? <path className="chart-band" d={bandPath} /> : null}
         <path className="chart-line" d={path} />
         {points.map((point) => {
           const x = scale(point.gapMm, minGap, maxGap, plotLeft, plotRight);
@@ -1182,6 +1187,26 @@ function TraceGapChart({
               cy={y}
               onClick={() => onPointSelect(point.traceWidthMm, point.gapMm)}
               r="3.5"
+            />
+          );
+        })}
+        {points.map((point) => {
+          const x = scale(point.gapMm, minGap, maxGap, plotLeft, plotRight);
+          const y = scale(
+            point.traceWidthMm,
+            minTrace,
+            maxTrace,
+            plotBottom,
+            plotTop,
+          );
+          return (
+            <circle
+              key={`hit-${point.gapMm}`}
+              className="chart-hit-dot"
+              cx={x}
+              cy={y}
+              onClick={() => onPointSelect(point.traceWidthMm, point.gapMm)}
+              r="12"
             />
           );
         })}
@@ -1295,7 +1320,8 @@ function TraceGapChart({
 function createTraceGapSeries(
   input: DifferentialPairInput,
   currentGapMm: number,
-): TraceGapPoint[] {
+  tolerancePercent: number,
+): TraceGapSeries {
   const defaultMinimumGap = Math.max(0.05, input.dielectricHeightMm * 0.35);
   const minimumGap = Math.max(
     0.001,
@@ -1308,6 +1334,11 @@ function createTraceGapSeries(
   );
   const steps = 13;
   const points: TraceGapPoint[] = [];
+  const lowerBand: TraceGapPoint[] = [];
+  const upperBand: TraceGapPoint[] = [];
+  const toleranceRatio = tolerancePercent / 100;
+  const lowerTargetOhms = input.targetDifferentialOhms * (1 - toleranceRatio);
+  const upperTargetOhms = input.targetDifferentialOhms * (1 + toleranceRatio);
 
   for (let index = 0; index < steps; index += 1) {
     const gapMm =
@@ -1324,9 +1355,30 @@ function createTraceGapSeries(
     } catch {
       continue;
     }
+
+    try {
+      lowerBand.push(
+        estimateTraceWidthForDifferentialGap(
+          lowerTargetOhms,
+          gapMm,
+          input.dielectricHeightMm,
+          input.dielectricConstant,
+        ),
+      );
+      upperBand.push(
+        estimateTraceWidthForDifferentialGap(
+          upperTargetOhms,
+          gapMm,
+          input.dielectricHeightMm,
+          input.dielectricConstant,
+        ),
+      );
+    } catch {
+      continue;
+    }
   }
 
-  return points;
+  return { points, lowerBand, upperBand };
 }
 
 function ouncesToMicrons(ounces: ThicknessControl["ounces"]): number {
