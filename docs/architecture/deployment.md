@@ -11,6 +11,7 @@
 - `npm run lint` checks TypeScript and React source.
 - `npm test` runs calculator unit tests.
 - `npm run build` type-checks and builds the static site.
+- CI verifies the built `dist/index.html` uses `/DiffPairUtil/assets/` URLs and does not publish the Vite development `/src/main.tsx` entrypoint.
 
 ## Hosting
 

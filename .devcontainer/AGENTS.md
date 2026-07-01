@@ -12,6 +12,7 @@
 
 - Keep toolchain versions pinned or intentionally selected by base image tag.
 - Install only development tools required to build, test, lint, and run the app.
+- Include GitHub CLI for authenticated repository, workflow, and Pages diagnostics.
 - Keep `node_modules` container-local so Windows-native packages are not reused inside Linux containers.
 - Do not place project source or generated build output in this folder.
 

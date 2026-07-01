@@ -37,6 +37,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify Pages artifact
+        run: |
+          test -f dist/index.html
+          grep -q '"/DiffPairUtil/assets/' dist/index.html
+          ! grep -q '"/src/main.tsx"' dist/index.html
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 

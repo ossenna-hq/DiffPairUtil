@@ -1,10 +1,10 @@
 {
   "name": "diff-pair-util",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
-  "runArgs": [
-    "--name",
-    "Typescript-Node-DevContainer"
-  ],
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "runArgs": ["--name", "Typescript-Node-DevContainer"],
   "customizations": {
     "vscode": {
       "extensions": [
@@ -19,9 +19,7 @@
       }
     }
   },
-  "forwardPorts": [
-    5173
-  ],
+  "forwardPorts": [5173],
   "mounts": [
     "source=${localWorkspaceFolderBasename}-node_modules,target=${containerWorkspaceFolder}/node_modules,type=volume"
   ],
