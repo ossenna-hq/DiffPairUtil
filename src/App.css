@@ -779,21 +779,23 @@ input:disabled {
   font-size: 12px;
 }
 
-.chart-tooltip {
-  fill: #17382e;
-  filter: drop-shadow(0 8px 14px rgb(20 30 26 / 22%));
-  pointer-events: none;
+.chart-hover-readout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 34px;
+  align-items: center;
+  border: 1px solid #cbd8d1;
+  border-radius: 8px;
+  background: #17382e;
+  color: #ffffff;
+  padding: 7px 9px;
 }
 
-.chart-tooltip-text {
-  fill: #ffffff;
-  font-size: 13px;
+.chart-hover-readout span {
+  color: inherit;
+  font-size: 0.8rem;
   font-weight: 800;
-  pointer-events: none;
-}
-
-.chart-tooltip-text.subtle {
-  fill: #d9ece3;
 }
 
 .tolerance-control {

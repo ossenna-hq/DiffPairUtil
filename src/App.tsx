@@ -1006,10 +1006,6 @@ function TraceGapChart({
   const plotRight = width - 46;
   const plotTop = 46;
   const plotBottom = height - 66;
-  const tooltipWidth = 170;
-  const tooltipHeight = tolerancePercent > 0 ? 66 : 48;
-  const tooltipX = plotRight - tooltipWidth - 12;
-  const tooltipY = plotTop + 12;
   const gapValues = [
     ...points.map((point) => point.gapMm),
     ...(currentPoint ? [currentPoint.gapMm] : []),
@@ -1257,27 +1253,6 @@ function TraceGapChart({
             </title>
           </circle>
         ) : null}
-        {hoveredPoint && activeX !== null && activeY !== null ? (
-          <g transform={`translate(${tooltipX} ${tooltipY})`}>
-            <rect
-              className="chart-tooltip"
-              width={tooltipWidth}
-              height={tooltipHeight}
-              rx="7"
-            />
-            <text className="chart-tooltip-text" x="10" y="19">
-              gap {formatMmMil(hoveredPoint.gapMm)}
-            </text>
-            <text className="chart-tooltip-text" x="10" y="37">
-              width {formatMmMil(hoveredPoint.traceWidthMm)}
-            </text>
-            {tolerancePercent > 0 ? (
-              <text className="chart-tooltip-text subtle" x="10" y="55">
-                band +/- {tolerancePercent}%
-              </text>
-            ) : null}
-          </g>
-        ) : null}
         <text
           className="chart-label"
           x={width / 2}
@@ -1294,6 +1269,17 @@ function TraceGapChart({
           Trace width (mm / mil)
         </text>
       </svg>
+      <div className="chart-hover-readout" aria-live="polite">
+        {hoveredPoint ? (
+          <>
+            <span>gap {formatMmMil(hoveredPoint.gapMm)}</span>
+            <span>width {formatMmMil(hoveredPoint.traceWidthMm)}</span>
+            <span>band +/- {tolerancePercent}%</span>
+          </>
+        ) : (
+          <span>No point selected</span>
+        )}
+      </div>
       <div className="chart-stats">
         <span>{targetOhms.toFixed(0)} ohm target</span>
         <span>+/- {tolerancePercent}% tolerance</span>
