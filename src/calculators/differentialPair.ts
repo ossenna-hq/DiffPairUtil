@@ -39,7 +39,9 @@ export interface ConstrainedDifferentialPairInput extends DifferentialPairInput 
 
 const MILS_PER_MM = 39.3700787402;
 
-export function estimateDifferentialPair(input: DifferentialPairInput): DifferentialPairEstimate {
+export function estimateDifferentialPair(
+  input: DifferentialPairInput,
+): DifferentialPairEstimate {
   validateInput(input);
 
   const heightMm = input.dielectricHeightMm;
@@ -48,13 +50,21 @@ export function estimateDifferentialPair(input: DifferentialPairInput): Differen
     heightMm,
     input.dielectricConstant,
   );
-  const singleEndedOhms = microstripImpedanceOhms(widthMm, heightMm, input.dielectricConstant);
+  const singleEndedOhms = microstripImpedanceOhms(
+    widthMm,
+    heightMm,
+    input.dielectricConstant,
+  );
   const gapMm = solveGapForDifferentialImpedance(
     input.targetDifferentialOhms,
     singleEndedOhms,
     heightMm,
   );
-  const differentialOhms = differentialImpedanceOhms(singleEndedOhms, gapMm, heightMm);
+  const differentialOhms = differentialImpedanceOhms(
+    singleEndedOhms,
+    gapMm,
+    heightMm,
+  );
 
   return {
     dielectricHeightMm: heightMm,
@@ -107,7 +117,11 @@ export function estimateConstrainedDifferentialPair(
     );
   }
 
-  const singleEndedOhms = microstripImpedanceOhms(widthMm, heightMm, input.dielectricConstant);
+  const singleEndedOhms = microstripImpedanceOhms(
+    widthMm,
+    heightMm,
+    input.dielectricConstant,
+  );
 
   if (!input.locks.gap) {
     gapMm = solveGapForDifferentialImpedance(
@@ -117,13 +131,32 @@ export function estimateConstrainedDifferentialPair(
     );
   }
 
-  const differentialOhms = differentialImpedanceOhms(singleEndedOhms, gapMm, heightMm);
+  const differentialOhms = differentialImpedanceOhms(
+    singleEndedOhms,
+    gapMm,
+    heightMm,
+  );
 
-  if (input.locks.traceWidth && Math.abs(singleEndedOhms - input.targetSingleEndedOhms) > 0.5) {
-    notes.push("Locked track width prevents matching the single-ended target exactly.");
+  if (
+    input.locks.traceWidth &&
+    Math.abs(singleEndedOhms - input.targetSingleEndedOhms) > 0.5
+  ) {
+    notes.push(
+      "Locked track width prevents matching the single-ended target exactly.",
+    );
   }
 
-  if (input.locks.gap && Math.abs(differentialOhms - input.targetDifferentialOhms) > 0.5) {
+  if (
+    !input.locks.gap &&
+    Math.abs(differentialOhms - input.targetDifferentialOhms) > 0.5
+  ) {
+    notes.push(
+      "The closest achievable gap is outside the differential target.",
+    );
+  } else if (
+    input.locks.gap &&
+    Math.abs(differentialOhms - input.targetDifferentialOhms) > 0.5
+  ) {
     notes.push("Locked gap prevents matching the differential target exactly.");
   }
 
@@ -148,7 +181,9 @@ export function microstripImpedanceOhms(
   dielectricConstant: number,
 ): number {
   if (traceWidthMm <= 0 || dielectricHeightMm <= 0 || dielectricConstant <= 1) {
-    throw new Error("Microstrip impedance inputs must be positive and Dk must be greater than 1.");
+    throw new Error(
+      "Microstrip impedance inputs must be positive and Dk must be greater than 1.",
+    );
   }
 
   const widthHeightRatio = traceWidthMm / dielectricHeightMm;
@@ -181,7 +216,11 @@ export function differentialImpedanceOhms(
     throw new Error("Differential impedance inputs must be positive.");
   }
 
-  return 2 * singleEndedOhms * (1 - 0.48 * Math.exp((-0.96 * gapMm) / dielectricHeightMm));
+  return (
+    2 *
+    singleEndedOhms *
+    (1 - 0.48 * Math.exp((-0.96 * gapMm) / dielectricHeightMm))
+  );
 }
 
 export function mmToMils(valueMm: number): number {
@@ -207,8 +246,16 @@ export function estimateTraceWidthForDifferentialGap(
 
   for (let iteration = 0; iteration < 80; iteration += 1) {
     const mid = (low + high) / 2;
-    const singleEndedOhms = microstripImpedanceOhms(mid, dielectricHeightMm, dielectricConstant);
-    const differentialOhms = differentialImpedanceOhms(singleEndedOhms, gapMm, dielectricHeightMm);
+    const singleEndedOhms = microstripImpedanceOhms(
+      mid,
+      dielectricHeightMm,
+      dielectricConstant,
+    );
+    const differentialOhms = differentialImpedanceOhms(
+      singleEndedOhms,
+      gapMm,
+      dielectricHeightMm,
+    );
 
     if (differentialOhms > targetDifferentialOhms) {
       low = mid;
@@ -219,7 +266,11 @@ export function estimateTraceWidthForDifferentialGap(
 
   const traceWidthMm = (low + high) / 2;
   const differentialOhms = differentialImpedanceOhms(
-    microstripImpedanceOhms(traceWidthMm, dielectricHeightMm, dielectricConstant),
+    microstripImpedanceOhms(
+      traceWidthMm,
+      dielectricHeightMm,
+      dielectricConstant,
+    ),
     gapMm,
     dielectricHeightMm,
   );
@@ -253,7 +304,11 @@ function solveTraceWidthForImpedance(
 
   for (let iteration = 0; iteration < 80; iteration += 1) {
     const mid = (low + high) / 2;
-    const impedance = microstripImpedanceOhms(mid, dielectricHeightMm, dielectricConstant);
+    const impedance = microstripImpedanceOhms(
+      mid,
+      dielectricHeightMm,
+      dielectricConstant,
+    );
 
     if (impedance > targetOhms) {
       low = mid;
@@ -275,7 +330,11 @@ function solveDielectricHeightForSingleEndedImpedance(
 
   for (let iteration = 0; iteration < 80; iteration += 1) {
     const mid = (low + high) / 2;
-    const impedance = microstripImpedanceOhms(traceWidthMm, mid, dielectricConstant);
+    const impedance = microstripImpedanceOhms(
+      traceWidthMm,
+      mid,
+      dielectricConstant,
+    );
 
     if (impedance < targetOhms) {
       low = mid;
@@ -292,27 +351,37 @@ function solveGapForDifferentialImpedance(
   singleEndedOhms: number,
   dielectricHeightMm: number,
 ): number {
+  const minimumGapMm = dielectricHeightMm * 0.01;
+  const maximumGapMm = dielectricHeightMm * 20;
   const minimumDifferential = differentialImpedanceOhms(
     singleEndedOhms,
-    dielectricHeightMm * 0.01,
+    minimumGapMm,
     dielectricHeightMm,
   );
-  const maximumDifferential = 2 * singleEndedOhms;
+  const maximumDifferential = differentialImpedanceOhms(
+    singleEndedOhms,
+    maximumGapMm,
+    dielectricHeightMm,
+  );
 
-  if (targetOhms <= minimumDifferential || targetOhms >= maximumDifferential) {
-    throw new Error(
-      `Target differential impedance must be between ${minimumDifferential.toFixed(
-        1,
-      )} and ${maximumDifferential.toFixed(1)} ohms for these inputs.`,
-    );
+  if (targetOhms <= minimumDifferential) {
+    return minimumGapMm;
   }
 
-  let low = dielectricHeightMm * 0.01;
-  let high = dielectricHeightMm * 20;
+  if (targetOhms >= maximumDifferential) {
+    return maximumGapMm;
+  }
+
+  let low = minimumGapMm;
+  let high = maximumGapMm;
 
   for (let iteration = 0; iteration < 80; iteration += 1) {
     const mid = (low + high) / 2;
-    const impedance = differentialImpedanceOhms(singleEndedOhms, mid, dielectricHeightMm);
+    const impedance = differentialImpedanceOhms(
+      singleEndedOhms,
+      mid,
+      dielectricHeightMm,
+    );
 
     if (impedance < targetOhms) {
       low = mid;

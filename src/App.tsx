@@ -73,18 +73,28 @@ const initialManualDimensionHolds: DimensionLocks = {
 
 function App() {
   const [input, setInput] = useState<DifferentialPairInput>(initialInput);
-  const [configuration, setConfiguration] = useState<ImpedanceConfiguration>(initialConfiguration);
-  const [signalThickness, setSignalThickness] = useState<ThicknessControl>(initialThickness);
-  const [planeThickness, setPlaneThickness] = useState<ThicknessControl>(initialThickness);
-  const [manualDimensions, setManualDimensions] =
-    useState<ManualDimensions>(initialManualDimensions);
-  const [dimensionLocks, setDimensionLocks] = useState<DimensionLocks>(initialDimensionLocks);
-  const [manualDimensionHolds, setManualDimensionHolds] = useState(initialManualDimensionHolds);
+  const [configuration, setConfiguration] =
+    useState<ImpedanceConfiguration>(initialConfiguration);
+  const [signalThickness, setSignalThickness] =
+    useState<ThicknessControl>(initialThickness);
+  const [planeThickness, setPlaneThickness] =
+    useState<ThicknessControl>(initialThickness);
+  const [manualDimensions, setManualDimensions] = useState<ManualDimensions>(
+    initialManualDimensions,
+  );
+  const [dimensionLocks, setDimensionLocks] = useState<DimensionLocks>(
+    initialDimensionLocks,
+  );
+  const [manualDimensionHolds, setManualDimensionHolds] = useState(
+    initialManualDimensionHolds,
+  );
   const [tolerancePercent, setTolerancePercent] = useState(8);
 
   const estimate = useMemo(() => {
     const solverLocks = {
-      dielectricHeight: dimensionLocks.dielectricHeight || manualDimensionHolds.dielectricHeight,
+      dielectricHeight:
+        dimensionLocks.dielectricHeight ||
+        manualDimensionHolds.dielectricHeight,
       traceWidth: dimensionLocks.traceWidth || manualDimensionHolds.traceWidth,
       gap: dimensionLocks.gap || manualDimensionHolds.gap,
     };
@@ -101,7 +111,10 @@ function App() {
         error: null,
       };
     } catch (error) {
-      return { value: null, error: error instanceof Error ? error.message : "Invalid inputs." };
+      return {
+        value: null,
+        error: error instanceof Error ? error.message : "Invalid inputs.",
+      };
     }
   }, [dimensionLocks, input, manualDimensionHolds, manualDimensions]);
 
@@ -112,9 +125,16 @@ function App() {
 
     return createTraceGapSeries({
       ...input,
-      dielectricHeightMm: estimate.value?.dielectricHeightMm ?? manualDimensions.dielectricHeightMm,
+      dielectricHeightMm:
+        estimate.value?.dielectricHeightMm ??
+        manualDimensions.dielectricHeightMm,
     });
-  }, [configuration.signal, estimate.value?.dielectricHeightMm, input, manualDimensions.dielectricHeightMm]);
+  }, [
+    configuration.signal,
+    estimate.value?.dielectricHeightMm,
+    input,
+    manualDimensions.dielectricHeightMm,
+  ]);
 
   function updateNumber(field: keyof DifferentialPairInput, value: string) {
     setInput((current) => ({
@@ -157,7 +177,10 @@ function App() {
     }));
   }
 
-  function toggleDimensionLock(dimension: keyof DimensionLocks, solvedValueMm: number | null) {
+  function toggleDimensionLock(
+    dimension: keyof DimensionLocks,
+    solvedValueMm: number | null,
+  ) {
     setDimensionLocks((current) => {
       const nextLocked = !current[dimension];
       if (nextLocked && solvedValueMm !== null) {
@@ -198,8 +221,19 @@ function App() {
 
   const solvedDielectricHeightMm =
     estimate.value?.dielectricHeightMm ?? manualDimensions.dielectricHeightMm;
-  const solvedTraceWidthMm = estimate.value?.traceWidthMm ?? manualDimensions.traceWidthMm;
+  const solvedTraceWidthMm =
+    estimate.value?.traceWidthMm ?? manualDimensions.traceWidthMm;
   const solvedGapMm = estimate.value?.gapMm ?? manualDimensions.gapMm;
+  const singleEndedOutOfTolerance = isOutsideTolerance(
+    estimate.value?.singleEndedOhms ?? null,
+    input.targetSingleEndedOhms,
+    tolerancePercent,
+  );
+  const differentialOutOfTolerance = isOutsideTolerance(
+    estimate.value?.differentialOhms ?? null,
+    input.targetDifferentialOhms,
+    tolerancePercent,
+  );
 
   return (
     <main className="shell">
@@ -208,16 +242,16 @@ function App() {
           <p className="eyebrow">Ossenna PCB Utilities</p>
           <h1 id="page-title">Impedance Geometry Estimator</h1>
           <p>
-            Explore signal geometry, material assumptions, and planning dimensions for early PCB
-            stackup decisions.
+            Explore signal geometry, material assumptions, and planning
+            dimensions for early PCB stackup decisions.
           </p>
         </div>
 
         <div className="layout-grid">
           <form className="panel visual-panel primary-panel">
             <div className="target-controls" aria-label="Impedance targets">
-              <h2>Target:</h2>
-              <label>
+              <h2 className="target-heading">Target:</h2>
+              <label className="target-single-ended">
                 Single-ended
                 <span className="field-unit">ohms</span>
                 <input
@@ -225,7 +259,9 @@ function App() {
                   step="1"
                   type="number"
                   value={input.targetSingleEndedOhms}
-                  onChange={(event) => updateNumber("targetSingleEndedOhms", event.target.value)}
+                  onChange={(event) =>
+                    updateNumber("targetSingleEndedOhms", event.target.value)
+                  }
                 />
               </label>
 
@@ -236,14 +272,16 @@ function App() {
                   onChange={(event) =>
                     setConfiguration((current) => ({
                       ...current,
-                      signal: event.target.checked ? "differential" : "single-ended",
+                      signal: event.target.checked
+                        ? "differential"
+                        : "single-ended",
                     }))
                   }
                 />
                 Differential
               </label>
 
-              <label className="target-value">
+              <label className="target-value target-differential">
                 <span className="field-unit">ohms</span>
                 <input
                   disabled={configuration.signal === "single-ended"}
@@ -251,36 +289,79 @@ function App() {
                   step="1"
                   type="number"
                   value={input.targetDifferentialOhms}
-                  onChange={(event) => updateNumber("targetDifferentialOhms", event.target.value)}
+                  onChange={(event) =>
+                    updateNumber("targetDifferentialOhms", event.target.value)
+                  }
                 />
               </label>
 
-              <h2>Calculated:</h2>
-              <label className="target-calculated">
+              {configuration.signal === "differential" ? (
+                <label className="target-tolerance">
+                  Tolerance band
+                  <span className="field-unit">+/- {tolerancePercent}%</span>
+                  <input
+                    min="0"
+                    max="20"
+                    step="1"
+                    type="range"
+                    value={tolerancePercent}
+                    onChange={(event) =>
+                      setTolerancePercent(Number(event.target.value))
+                    }
+                  />
+                </label>
+              ) : (
+                <div className="target-tolerance" aria-hidden="true" />
+              )}
+
+              <h2 className="calculated-heading">Calculated:</h2>
+              <label className="target-calculated calculated-single-ended">
                 Single-ended
                 <span className="field-unit">ohms</span>
                 <input
+                  className={
+                    singleEndedOutOfTolerance
+                      ? "impedance-out-of-tolerance"
+                      : undefined
+                  }
                   readOnly
                   type="number"
-                  value={estimate.value ? estimate.value.singleEndedOhms.toFixed(1) : ""}
+                  value={
+                    estimate.value
+                      ? estimate.value.singleEndedOhms.toFixed(1)
+                      : ""
+                  }
                 />
               </label>
 
               <div className="target-row-spacer" aria-hidden="true" />
 
-              <label className="target-value target-calculated">
+              <label className="target-value target-calculated calculated-differential">
                 <span className="field-unit">ohms</span>
                 <input
+                  className={
+                    differentialOutOfTolerance
+                      ? "impedance-out-of-tolerance"
+                      : undefined
+                  }
                   readOnly
                   type="number"
-                  value={estimate.value ? estimate.value.differentialOhms.toFixed(1) : ""}
+                  value={
+                    estimate.value
+                      ? estimate.value.differentialOhms.toFixed(1)
+                      : ""
+                  }
                 />
               </label>
             </div>
 
             <div className="section-heading">
               <h2>Cross Section:</h2>
-              <span>{configuration.coupling === "coplanar" ? "Coplanar" : "Microstrip"}</span>
+              <span>
+                {configuration.coupling === "coplanar"
+                  ? "Coplanar"
+                  : "Microstrip"}
+              </span>
             </div>
 
             <div className="cross-section-workbench">
@@ -293,7 +374,10 @@ function App() {
 
                 <div className="stack-divider" />
 
-                <section className="dielectric-controls" aria-label="Dielectric controls">
+                <section
+                  className="dielectric-controls"
+                  aria-label="Dielectric controls"
+                >
                   <h3>Dielectric:</h3>
                   <label className="dk-row">
                     Dk:
@@ -302,7 +386,9 @@ function App() {
                       step="0.05"
                       type="number"
                       value={input.dielectricConstant}
-                      onChange={(event) => updateNumber("dielectricConstant", event.target.value)}
+                      onChange={(event) =>
+                        updateNumber("dielectricConstant", event.target.value)
+                      }
                     />
                   </label>
                   <div className="thickness-control-grid">
@@ -310,10 +396,16 @@ function App() {
                       locked={dimensionLocks.dielectricHeight}
                       label="dielectric thickness"
                       onClick={() =>
-                        toggleDimensionLock("dielectricHeight", solvedDielectricHeightMm)
+                        toggleDimensionLock(
+                          "dielectricHeight",
+                          solvedDielectricHeightMm,
+                        )
                       }
                     />
-                    <div className="dual-units" aria-label="Dielectric thickness">
+                    <div
+                      className="dual-units"
+                      aria-label="Dielectric thickness"
+                    >
                       <label>
                         <span>mm</span>
                         <input
@@ -323,7 +415,9 @@ function App() {
                           step="0.001"
                           type="number"
                           value={solvedDielectricHeightMm.toFixed(3)}
-                          onChange={(event) => updateDielectricHeight(Number(event.target.value))}
+                          onChange={(event) =>
+                            updateDielectricHeight(Number(event.target.value))
+                          }
                         />
                       </label>
                       <label>
@@ -336,7 +430,9 @@ function App() {
                           type="number"
                           value={mmToMils(solvedDielectricHeightMm).toFixed(1)}
                           onChange={(event) =>
-                            updateDielectricHeight(Number(event.target.value) / mmToMils(1))
+                            updateDielectricHeight(
+                              Number(event.target.value) / mmToMils(1),
+                            )
                           }
                         />
                       </label>
@@ -354,7 +450,10 @@ function App() {
               </aside>
 
               <div className="geometry-frame">
-                <div className="graphic-toggles" aria-label="Cross section options">
+                <div
+                  className="graphic-toggles"
+                  aria-label="Cross section options"
+                >
                   <label className="check-control">
                     <input
                       checked={configuration.coupling === "coplanar"}
@@ -362,7 +461,9 @@ function App() {
                       onChange={(event) =>
                         setConfiguration((current) => ({
                           ...current,
-                          coupling: event.target.checked ? "coplanar" : "non-coplanar",
+                          coupling: event.target.checked
+                            ? "coplanar"
+                            : "non-coplanar",
                         }))
                       }
                     />
@@ -375,7 +476,9 @@ function App() {
                       onChange={(event) =>
                         setConfiguration((current) => ({
                           ...current,
-                          solderMask: event.target.checked ? "with-mask" : "without-mask",
+                          solderMask: event.target.checked
+                            ? "with-mask"
+                            : "without-mask",
                         }))
                       }
                     />
@@ -387,7 +490,9 @@ function App() {
                     aria-label="Decrease dielectric thickness"
                     disabled={dimensionLocks.dielectricHeight}
                     type="button"
-                    onClick={() => updateDielectricHeight(solvedDielectricHeightMm - 0.01)}
+                    onClick={() =>
+                      updateDielectricHeight(solvedDielectricHeightMm - 0.01)
+                    }
                   >
                     -
                   </button>
@@ -400,13 +505,17 @@ function App() {
                     type="range"
                     disabled={dimensionLocks.dielectricHeight}
                     value={solvedDielectricHeightMm}
-                    onChange={(event) => updateDielectricHeight(Number(event.target.value))}
+                    onChange={(event) =>
+                      updateDielectricHeight(Number(event.target.value))
+                    }
                   />
                   <button
                     aria-label="Increase dielectric thickness"
                     disabled={dimensionLocks.dielectricHeight}
                     type="button"
-                    onClick={() => updateDielectricHeight(solvedDielectricHeightMm + 0.01)}
+                    onClick={() =>
+                      updateDielectricHeight(solvedDielectricHeightMm + 0.01)
+                    }
                   >
                     +
                   </button>
@@ -423,8 +532,12 @@ function App() {
                   locks={dimensionLocks}
                   signal={configuration.signal}
                   onGapChange={updateGap}
-                  onGapLockToggle={() => toggleDimensionLock("gap", solvedGapMm)}
-                  onTraceLockToggle={() => toggleDimensionLock("traceWidth", solvedTraceWidthMm)}
+                  onGapLockToggle={() =>
+                    toggleDimensionLock("gap", solvedGapMm)
+                  }
+                  onTraceLockToggle={() =>
+                    toggleDimensionLock("traceWidth", solvedTraceWidthMm)
+                  }
                   onTraceWidthChange={updateTraceWidth}
                 />
               </div>
@@ -454,7 +567,11 @@ function App() {
                         ? formatMmMil(estimate.value.gapMm)
                         : "N/A"
                     }
-                    imperial={configuration.signal === "differential" ? "calculated" : "single ended"}
+                    imperial={
+                      configuration.signal === "differential"
+                        ? "calculated"
+                        : "single ended"
+                    }
                   />
                   <ResultMetric
                     label="Signal copper"
@@ -463,7 +580,9 @@ function App() {
                   />
                   <ResultMetric
                     label="Effective Dk"
-                    metric={estimate.value.effectiveDielectricConstant.toFixed(2)}
+                    metric={estimate.value.effectiveDielectricConstant.toFixed(
+                      2,
+                    )}
                     imperial="calculated"
                   />
                 </div>
@@ -474,7 +593,10 @@ function App() {
                     {estimate.value.notes.map((note) => (
                       <li key={note}>{note}</li>
                     ))}
-                    <li>Coplanar, solder mask, and copper thickness corrections are visual controls only.</li>
+                    <li>
+                      Coplanar, solder mask, and copper thickness corrections
+                      are visual controls only.
+                    </li>
                   </ul>
                 </div>
               </>
@@ -485,31 +607,21 @@ function App() {
             <div className="panel-heading">
               <h2>Width vs Gap</h2>
               <span>
-                {configuration.signal === "differential" ? `+/- ${tolerancePercent}%` : "Hidden"}
+                {configuration.signal === "differential"
+                  ? `+/- ${tolerancePercent}%`
+                  : "Hidden"}
               </span>
             </div>
             {configuration.signal === "differential" ? (
-              <>
-                <label className="tolerance-control">
-                  Tolerance band
-                  <span className="field-unit">+/- {tolerancePercent}%</span>
-                  <input
-                    min="0"
-                    max="20"
-                    step="1"
-                    type="range"
-                    value={tolerancePercent}
-                    onChange={(event) => setTolerancePercent(Number(event.target.value))}
-                  />
-                </label>
-                <TraceGapChart
-                  points={traceGapSeries}
-                  targetOhms={input.targetDifferentialOhms}
-                  tolerancePercent={tolerancePercent}
-                />
-              </>
+              <TraceGapChart
+                points={traceGapSeries}
+                targetOhms={input.targetDifferentialOhms}
+                tolerancePercent={tolerancePercent}
+              />
             ) : (
-              <div className="empty-state">Select Differential Pair to inspect trace width versus gap.</div>
+              <div className="empty-state">
+                Select Differential Pair to inspect trace width versus gap.
+              </div>
             )}
           </section>
         </div>
@@ -530,7 +642,9 @@ function ThicknessField({ label, value, onChange }: ThicknessFieldProps) {
       <legend>{label}</legend>
       <select
         value={value.ounces}
-        onChange={(event) => onChange(event.target.value as ThicknessControl["ounces"])}
+        onChange={(event) =>
+          onChange(event.target.value as ThicknessControl["ounces"])
+        }
       >
         <option value="0.5">0.5 oz / 0.7mil / 17um</option>
         <option value="1">1 oz / 1.4mil / 35um</option>
@@ -604,7 +718,11 @@ function DimensionReadout({
     <div className={`dimension-readout ${className}`}>
       <h3>{label}</h3>
       <div className="dimension-body">
-        <LockButton locked={locked} label={label.replace(":", "").toLowerCase()} onClick={onLockToggle} />
+        <LockButton
+          locked={locked}
+          label={label.replace(":", "").toLowerCase()}
+          onClick={onLockToggle}
+        />
         <div className="dual-units">
           <label>
             <span>mm</span>
@@ -625,7 +743,9 @@ function DimensionReadout({
               step="0.1"
               type="number"
               value={valueMm === null ? "" : mmToMils(valueMm).toFixed(1)}
-              onChange={(event) => onChange(Number(event.target.value) / mmToMils(1))}
+              onChange={(event) =>
+                onChange(Number(event.target.value) / mmToMils(1))
+              }
             />
           </label>
         </div>
@@ -712,7 +832,13 @@ function GeometryGraphic({
   const isDifferential = configuration.signal === "differential";
   const isCoplanar = configuration.coupling === "coplanar";
   const surfaceY = 206;
-  const dielectricVisualHeight = scale(clamp(dielectricHeightMm, 0.05, 0.6), 0.05, 0.6, 72, 182);
+  const dielectricVisualHeight = scale(
+    clamp(dielectricHeightMm, 0.05, 0.6),
+    0.05,
+    0.6,
+    72,
+    182,
+  );
   const boardBottomY = surfaceY + dielectricVisualHeight;
   const leftTraceX = 380 - traceWidth - gapWidth / 2;
   const rightTraceX = 380 + gapWidth / 2;
@@ -729,19 +855,23 @@ function GeometryGraphic({
         { x: rightTraceX, width: traceWidth },
       ]
     : [{ x: singleTraceX, width: traceWidth }];
-  const maskPath = createSolderMaskPath([...coplanarShapes, ...traceShapes], surfaceY, traceHeight);
+  const maskPath = createSolderMaskPath(
+    [...coplanarShapes, ...traceShapes],
+    surfaceY,
+    traceHeight,
+  );
 
   return (
-      <svg className="geometry-svg" role="img" viewBox="0 0 760 430">
-        <title>Selected PCB impedance geometry</title>
-        <rect
-          className="svg-board"
-          x="62"
-          y={surfaceY}
-          width="636"
-          height={dielectricVisualHeight}
-          rx="12"
-        />
+    <svg className="geometry-svg" role="img" viewBox="0 0 760 430">
+      <title>Selected PCB impedance geometry</title>
+      <rect
+        className="svg-board"
+        x="62"
+        y={surfaceY}
+        width="636"
+        height={dielectricVisualHeight}
+        rx="12"
+      />
       <rect
         className="svg-plane"
         x="88"
@@ -793,12 +923,25 @@ function GeometryGraphic({
           </text>
         </>
       ) : null}
-      <line className="svg-measure" x1="704" y1={surfaceY} x2="704" y2={boardBottomY} />
-      <text className="svg-label" x="690" y={(surfaceY + boardBottomY) / 2} textAnchor="end">
+      <line
+        className="svg-measure"
+        x1="704"
+        y1={surfaceY}
+        x2="704"
+        y2={boardBottomY}
+      />
+      <text
+        className="svg-label"
+        x="690"
+        y={(surfaceY + boardBottomY) / 2}
+        textAnchor="end"
+      >
         {formatMmMil(dielectricHeightMm)} dielectric
       </text>
       <text className="svg-label dark" x="380" y="382" textAnchor="middle">
-        {isCoplanar ? "coplanar reference copper plus plane" : "reference plane"}
+        {isCoplanar
+          ? "coplanar reference copper plus plane"
+          : "reference plane"}
       </text>
     </svg>
   );
@@ -810,11 +953,19 @@ interface TraceGapChartProps {
   tolerancePercent: number;
 }
 
-function TraceGapChart({ points, targetOhms, tolerancePercent }: TraceGapChartProps) {
+function TraceGapChart({
+  points,
+  targetOhms,
+  tolerancePercent,
+}: TraceGapChartProps) {
   const [hoveredPoint, setHoveredPoint] = useState<TraceGapPoint | null>(null);
 
   if (points.length < 2) {
-    return <div className="empty-state">Current inputs do not produce a usable sweep.</div>;
+    return (
+      <div className="empty-state">
+        Current inputs do not produce a usable sweep.
+      </div>
+    );
   }
 
   const width = 640;
@@ -834,27 +985,47 @@ function TraceGapChart({ points, targetOhms, tolerancePercent }: TraceGapChartPr
     ...point,
     traceWidthMm: point.traceWidthMm * (1 + toleranceRatio),
   }));
-  const traceValues = [...lowerBand, ...points, ...upperBand].map((point) => point.traceWidthMm);
+  const traceValues = [...lowerBand, ...points, ...upperBand].map(
+    (point) => point.traceWidthMm,
+  );
   const minTrace = Math.min(...traceValues);
   const maxTrace = Math.max(...traceValues);
   const path = points
     .map((point, index) => {
       const x = scale(point.gapMm, minGap, maxGap, plotLeft, plotRight);
-      const y = scale(point.traceWidthMm, minTrace, maxTrace, plotBottom, plotTop);
+      const y = scale(
+        point.traceWidthMm,
+        minTrace,
+        maxTrace,
+        plotBottom,
+        plotTop,
+      );
       return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
     })
     .join(" ");
   const upperPath = upperBand
     .map((point, index) => {
       const x = scale(point.gapMm, minGap, maxGap, plotLeft, plotRight);
-      const y = scale(point.traceWidthMm, minTrace, maxTrace, plotBottom, plotTop);
+      const y = scale(
+        point.traceWidthMm,
+        minTrace,
+        maxTrace,
+        plotBottom,
+        plotTop,
+      );
       return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
     })
     .join(" ");
   const lowerPath = lowerBand
     .map((point) => {
       const x = scale(point.gapMm, minGap, maxGap, plotLeft, plotRight);
-      const y = scale(point.traceWidthMm, minTrace, maxTrace, plotBottom, plotTop);
+      const y = scale(
+        point.traceWidthMm,
+        minTrace,
+        maxTrace,
+        plotBottom,
+        plotTop,
+      );
       return `L ${x.toFixed(2)} ${y.toFixed(2)}`;
     })
     .reverse()
@@ -862,7 +1033,13 @@ function TraceGapChart({ points, targetOhms, tolerancePercent }: TraceGapChartPr
   const bandPath = `${upperPath} ${lowerPath} Z`;
   const activePoint = hoveredPoint ?? points[Math.floor(points.length / 2)];
   const activeX = scale(activePoint.gapMm, minGap, maxGap, plotLeft, plotRight);
-  const activeY = scale(activePoint.traceWidthMm, minTrace, maxTrace, plotBottom, plotTop);
+  const activeY = scale(
+    activePoint.traceWidthMm,
+    minTrace,
+    maxTrace,
+    plotBottom,
+    plotTop,
+  );
 
   function handleChartMove(event: MouseEvent<SVGSVGElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -870,7 +1047,9 @@ function TraceGapChart({ points, targetOhms, tolerancePercent }: TraceGapChartPr
     const nearest = points.reduce((best, point) => {
       const pointX = scale(point.gapMm, minGap, maxGap, plotLeft, plotRight);
       const bestX = scale(best.gapMm, minGap, maxGap, plotLeft, plotRight);
-      return Math.abs(pointX - xInSvg) < Math.abs(bestX - xInSvg) ? point : best;
+      return Math.abs(pointX - xInSvg) < Math.abs(bestX - xInSvg)
+        ? point
+        : best;
     }, points[0]);
 
     setHoveredPoint(nearest);
@@ -886,31 +1065,93 @@ function TraceGapChart({ points, targetOhms, tolerancePercent }: TraceGapChartPr
         onMouseMove={handleChartMove}
       >
         <title>Trace width versus gap for target differential impedance</title>
-        <line className="axis" x1={plotLeft} y1={plotBottom} x2={plotRight} y2={plotBottom} />
-        <line className="axis" x1={plotLeft} y1={plotTop} x2={plotLeft} y2={plotBottom} />
-        <text className="chart-tick" x={plotLeft} y={height - 29} textAnchor="start">
+        <line
+          className="axis"
+          x1={plotLeft}
+          y1={plotBottom}
+          x2={plotRight}
+          y2={plotBottom}
+        />
+        <line
+          className="axis"
+          x1={plotLeft}
+          y1={plotTop}
+          x2={plotLeft}
+          y2={plotBottom}
+        />
+        <text
+          className="chart-tick"
+          x={plotLeft}
+          y={height - 29}
+          textAnchor="start"
+        >
           {formatMmMil(minGap)}
         </text>
-        <text className="chart-tick" x={plotRight} y={height - 29} textAnchor="end">
+        <text
+          className="chart-tick"
+          x={plotRight}
+          y={height - 29}
+          textAnchor="end"
+        >
           {formatMmMil(maxGap)}
         </text>
-        <text className="chart-tick" x={plotLeft + 8} y={plotBottom - 7} textAnchor="start">
+        <text
+          className="chart-tick"
+          x={plotLeft + 8}
+          y={plotBottom - 7}
+          textAnchor="start"
+        >
           {formatMmMil(minTrace)}
         </text>
-        <text className="chart-tick" x={plotLeft + 8} y={plotTop + 13} textAnchor="start">
+        <text
+          className="chart-tick"
+          x={plotLeft + 8}
+          y={plotTop + 13}
+          textAnchor="start"
+        >
           {formatMmMil(maxTrace)}
         </text>
-        {tolerancePercent > 0 ? <path className="chart-band" d={bandPath} /> : null}
+        {tolerancePercent > 0 ? (
+          <path className="chart-band" d={bandPath} />
+        ) : null}
         <path className="chart-line" d={path} />
         {points.map((point) => {
           const x = scale(point.gapMm, minGap, maxGap, plotLeft, plotRight);
-          const y = scale(point.traceWidthMm, minTrace, maxTrace, plotBottom, plotTop);
-          return <circle key={point.gapMm} className="chart-dot" cx={x} cy={y} r="3.5" />;
+          const y = scale(
+            point.traceWidthMm,
+            minTrace,
+            maxTrace,
+            plotBottom,
+            plotTop,
+          );
+          return (
+            <circle
+              key={point.gapMm}
+              className="chart-dot"
+              cx={x}
+              cy={y}
+              r="3.5"
+            />
+          );
         })}
-        <line className="crosshair" x1={activeX} y1={plotTop} x2={activeX} y2={plotBottom} />
-        <line className="crosshair" x1={plotLeft} y1={activeY} x2={plotRight} y2={activeY} />
+        <line
+          className="crosshair"
+          x1={activeX}
+          y1={plotTop}
+          x2={activeX}
+          y2={plotBottom}
+        />
+        <line
+          className="crosshair"
+          x1={plotLeft}
+          y1={activeY}
+          x2={plotRight}
+          y2={activeY}
+        />
         <circle className="chart-active-dot" cx={activeX} cy={activeY} r="6" />
-        <g transform={`translate(${Math.min(activeX + 14, width - 190)} ${Math.max(activeY - 58, 18)})`}>
+        <g
+          transform={`translate(${Math.min(activeX + 14, width - 190)} ${Math.max(activeY - 58, 18)})`}
+        >
           <rect
             className="chart-tooltip"
             width="170"
@@ -929,7 +1170,12 @@ function TraceGapChart({ points, targetOhms, tolerancePercent }: TraceGapChartPr
             </text>
           ) : null}
         </g>
-        <text className="chart-label" x={width / 2} y={height - 12} textAnchor="middle">
+        <text
+          className="chart-label"
+          x={width / 2}
+          y={height - 12}
+          textAnchor="middle"
+        >
           Gap between traces (mm / mil)
         </text>
         <text
@@ -956,12 +1202,16 @@ function TraceGapChart({ points, targetOhms, tolerancePercent }: TraceGapChartPr
 
 function createTraceGapSeries(input: DifferentialPairInput): TraceGapPoint[] {
   const minimumGap = Math.max(0.05, input.dielectricHeightMm * 0.35);
-  const maximumGap = Math.max(minimumGap + 0.12, input.dielectricHeightMm * 3.2);
+  const maximumGap = Math.max(
+    minimumGap + 0.12,
+    input.dielectricHeightMm * 3.2,
+  );
   const steps = 13;
   const points: TraceGapPoint[] = [];
 
   for (let index = 0; index < steps; index += 1) {
-    const gapMm = minimumGap + ((maximumGap - minimumGap) * index) / (steps - 1);
+    const gapMm =
+      minimumGap + ((maximumGap - minimumGap) * index) / (steps - 1);
     try {
       points.push(
         estimateTraceWidthForDifferentialGap(
@@ -996,7 +1246,31 @@ function formatMicronMil(valueMicrons: number): string {
   return formatMmMil(valueMm);
 }
 
-function trapezoidPoints(x: number, surfaceY: number, bottomWidth: number, height: number): string {
+function isOutsideTolerance(
+  calculatedOhms: number | null,
+  targetOhms: number,
+  tolerancePercent: number,
+): boolean {
+  if (
+    calculatedOhms === null ||
+    !Number.isFinite(calculatedOhms) ||
+    !Number.isFinite(targetOhms)
+  ) {
+    return false;
+  }
+
+  return (
+    Math.abs(calculatedOhms - targetOhms) >
+    targetOhms * (tolerancePercent / 100)
+  );
+}
+
+function trapezoidPoints(
+  x: number,
+  surfaceY: number,
+  bottomWidth: number,
+  height: number,
+): string {
   const topInset = bottomWidth * 0.07;
   return [
     `${x},${surfaceY}`,
@@ -1058,7 +1332,8 @@ function scale(
 
   return (
     outputMinimum +
-    ((value - inputMinimum) / (inputMaximum - inputMinimum)) * (outputMaximum - outputMinimum)
+    ((value - inputMinimum) / (inputMaximum - inputMinimum)) *
+      (outputMaximum - outputMinimum)
   );
 }
 

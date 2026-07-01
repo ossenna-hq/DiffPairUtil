@@ -3,6 +3,7 @@
 ## Development
 
 - VS Code Dev Containers define the development environment under `.devcontainer/`.
+- Local development and GitHub Actions use Node.js 24.
 - `npm install` prepares dependencies inside the container.
 - `npm run dev` starts the local Vite server on port `5173`.
 

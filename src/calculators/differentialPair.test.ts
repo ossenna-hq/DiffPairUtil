@@ -72,7 +72,9 @@ describe("differential pair estimator", () => {
 
     expect(result.gapMm).toBe(0.2);
     expect(result.singleEndedOhms).toBeCloseTo(50, 1);
-    expect(result.notes).toContain("Locked gap prevents matching the differential target exactly.");
+    expect(result.notes).toContain(
+      "Locked gap prevents matching the differential target exactly.",
+    );
   });
 
   it("adjusts unlocked dielectric height when trace width is locked", () => {
@@ -96,5 +98,29 @@ describe("differential pair estimator", () => {
     expect(result.traceWidthMm).toBe(0.3);
     expect(result.singleEndedOhms).toBeCloseTo(50, 1);
     expect(result.differentialOhms).toBeCloseTo(90, 1);
+  });
+
+  it("returns the closest achievable gap instead of throwing for unreachable differential targets", () => {
+    const result = estimateConstrainedDifferentialPair({
+      dielectricHeightMm: 0.18,
+      dielectricConstant: 4.2,
+      copperThicknessUm: 35,
+      targetDifferentialOhms: 5,
+      targetSingleEndedOhms: 50,
+      geometry: "microstrip",
+      traceWidthMm: 0.3,
+      gapMm: 0.25,
+      locks: {
+        dielectricHeight: true,
+        traceWidth: false,
+        gap: false,
+      },
+    });
+
+    expect(result.gapMm).toBeCloseTo(0.0018, 4);
+    expect(result.differentialOhms).toBeGreaterThan(5);
+    expect(result.notes).toContain(
+      "The closest achievable gap is outside the differential target.",
+    );
   });
 });

@@ -13,6 +13,7 @@
 - Workflows must be reproducible from committed files.
 - Deployment must only publish build artifacts produced by CI.
 - Keep workflow permissions minimal and explicit.
+- Use Node.js 24 for repository validation and Pages builds.
 
 ## Work Guidance
 

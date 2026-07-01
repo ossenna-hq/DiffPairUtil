@@ -11,6 +11,7 @@
 ## Local Contracts
 
 - Keep toolchain versions pinned or intentionally selected by base image tag.
+- Use the Node.js 24 devcontainer image to match GitHub Actions.
 - Install only development tools required to build, test, lint, and run the app.
 - Include GitHub CLI for authenticated repository, workflow, and Pages diagnostics.
 - Keep `node_modules` container-local so Windows-native packages are not reused inside Linux containers.
