@@ -614,6 +614,7 @@ function App() {
             </div>
             {configuration.signal === "differential" ? (
               <TraceGapChart
+                currentPoint={estimate.value}
                 points={traceGapSeries}
                 targetOhms={input.targetDifferentialOhms}
                 tolerancePercent={tolerancePercent}
@@ -948,12 +949,14 @@ function GeometryGraphic({
 }
 
 interface TraceGapChartProps {
+  currentPoint: ReturnType<typeof estimateDifferentialPair> | null;
   points: TraceGapPoint[];
   targetOhms: number;
   tolerancePercent: number;
 }
 
 function TraceGapChart({
+  currentPoint,
   points,
   targetOhms,
   tolerancePercent,
@@ -974,8 +977,12 @@ function TraceGapChart({
   const plotRight = width - 46;
   const plotTop = 46;
   const plotBottom = height - 66;
-  const minGap = Math.min(...points.map((point) => point.gapMm));
-  const maxGap = Math.max(...points.map((point) => point.gapMm));
+  const gapValues = [
+    ...points.map((point) => point.gapMm),
+    ...(currentPoint ? [currentPoint.gapMm] : []),
+  ];
+  const minGap = Math.min(...gapValues);
+  const maxGap = Math.max(...gapValues);
   const toleranceRatio = tolerancePercent / 100;
   const lowerBand = points.map((point) => ({
     ...point,
@@ -988,8 +995,27 @@ function TraceGapChart({
   const traceValues = [...lowerBand, ...points, ...upperBand].map(
     (point) => point.traceWidthMm,
   );
+  if (currentPoint) {
+    traceValues.push(currentPoint.traceWidthMm);
+  }
   const minTrace = Math.min(...traceValues);
   const maxTrace = Math.max(...traceValues);
+  const currentPointOutOfTolerance = currentPoint
+    ? isOutsideTolerance(
+        currentPoint.differentialOhms,
+        targetOhms,
+        tolerancePercent,
+      )
+    : false;
+  const currentPointStatus = currentPointOutOfTolerance
+    ? "outside target"
+    : "within target";
+  const currentPointX = currentPoint
+    ? scale(currentPoint.gapMm, minGap, maxGap, plotLeft, plotRight)
+    : null;
+  const currentPointY = currentPoint
+    ? scale(currentPoint.traceWidthMm, minTrace, maxTrace, plotBottom, plotTop)
+    : null;
   const path = points
     .map((point, index) => {
       const x = scale(point.gapMm, minGap, maxGap, plotLeft, plotRight);
@@ -1149,6 +1175,25 @@ function TraceGapChart({
           y2={activeY}
         />
         <circle className="chart-active-dot" cx={activeX} cy={activeY} r="6" />
+        {currentPoint && currentPointX !== null && currentPointY !== null ? (
+          <circle
+            className={
+              currentPointOutOfTolerance
+                ? "chart-current-dot outside"
+                : "chart-current-dot within"
+            }
+            cx={currentPointX}
+            cy={currentPointY}
+            r="8"
+          >
+            <title>
+              Track {formatMmMil(currentPoint.traceWidthMm)}, gap{" "}
+              {formatMmMil(currentPoint.gapMm)}, differential{" "}
+              {currentPoint.differentialOhms.toFixed(1)} ohms,{" "}
+              {currentPointStatus}
+            </title>
+          </circle>
+        ) : null}
         <g
           transform={`translate(${Math.min(activeX + 14, width - 190)} ${Math.max(activeY - 58, 18)})`}
         >
@@ -1195,6 +1240,17 @@ function TraceGapChart({
         <span>
           {formatMmMil(minTrace)} - {formatMmMil(maxTrace)} width
         </span>
+        {currentPoint ? (
+          <span
+            className={
+              currentPointOutOfTolerance
+                ? "chart-current-stat outside"
+                : "chart-current-stat within"
+            }
+          >
+            track/gap {currentPointStatus}
+          </span>
+        ) : null}
       </div>
     </div>
   );

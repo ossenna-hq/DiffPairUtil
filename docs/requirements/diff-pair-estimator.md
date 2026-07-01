@@ -17,7 +17,7 @@
 - User can see the signal copper stay at a fixed vertical position while dielectric and reference-plane graphics grow downward as dielectric thickness changes.
 - User can estimate trace width and pair gap for an edge-coupled microstrip geometry.
 - User can use the cross-section visualization as the primary work surface, with geometry and material controls colocated with the drawing.
-- User can see a trace-width-versus-gap graph for differential pair planning with axis units, hover readouts, and adjustable tolerance banding.
+- User can see a trace-width-versus-gap graph for differential pair planning with axis units, hover readouts, adjustable tolerance banding, and a live Track/Gap datapoint that is green inside tolerance or red outside tolerance.
 - User can see the assumptions and approximation limits that apply to the estimate.
 - User can use manual material inputs only in the initial version.
 - User can read linear measurements with metric and imperial values shown together in millimeters and mils.

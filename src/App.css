@@ -737,6 +737,19 @@ input:disabled {
   stroke-width: 2;
 }
 
+.chart-current-dot {
+  stroke: #ffffff;
+  stroke-width: 3;
+}
+
+.chart-current-dot.within {
+  fill: #14804a;
+}
+
+.chart-current-dot.outside {
+  fill: #b42318;
+}
+
 .crosshair {
   stroke: #244b60;
   stroke-dasharray: 4 5;
@@ -788,6 +801,18 @@ input:disabled {
   padding: 6px 10px;
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.chart-stats .chart-current-stat.within {
+  border-color: #8fc9a8;
+  background: #ecf8f0;
+  color: #126c40;
+}
+
+.chart-stats .chart-current-stat.outside {
+  border-color: #eba29a;
+  background: #fff3f0;
+  color: #a32016;
 }
 
 @media (max-width: 980px) {
