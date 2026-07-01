@@ -729,6 +729,7 @@ input:disabled {
   fill: #c97823;
   stroke: #ffffff;
   stroke-width: 1.5;
+  cursor: pointer;
 }
 
 .chart-active-dot {

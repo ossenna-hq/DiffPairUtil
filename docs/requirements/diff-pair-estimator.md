@@ -11,13 +11,14 @@
 - User can adjust prepreg/core thickness with millimeter and mil entries in the stackup control card and a vertical slider with increment buttons inside the cross-section visualization.
 - User can adjust Dk from the dielectric section of the cross-section control card.
 - User can see calculated track width and gap readouts aligned above the corresponding track and gap in the cross-section graphic, with directly editable millimeter/mil number fields whose native up/down steppers provide fine adjustment.
-- User can lock or unlock dielectric thickness, track width, and gap using padlock buttons; locked dimensions remain fixed while unlocked dimensions are adjusted to solve the active impedance targets where possible.
+- User can lock or unlock dielectric thickness, track width, and gap using padlock buttons; locked dimensions are protected from calculation updates but remain directly editable by the user.
 - User can continue editing dielectric thickness, track width, and gap when the exact impedance target cannot be achieved; calculated impedance readouts show the closest achievable result.
 - User sees dielectric thickness, track width, and gap padlocks unlocked by default when the form first loads.
 - User can see the signal copper stay at a fixed vertical position while dielectric and reference-plane graphics grow downward as dielectric thickness changes.
 - User can estimate trace width and pair gap for an edge-coupled microstrip geometry.
 - User can use the cross-section visualization as the primary work surface, with geometry and material controls colocated with the drawing.
-- User can see a trace-width-versus-gap graph for differential pair planning with axis units, hover readouts, adjustable tolerance banding, and a live Track/Gap datapoint that is green inside tolerance or red outside tolerance.
+- User can see a trace-width-versus-gap graph for differential pair planning with axis units, plot-bounded hover readouts, adjustable tolerance banding that follows the selected gap range, and a live Track/Gap datapoint that is green inside tolerance or red outside tolerance.
+- User can click a Width vs Gap graph datapoint to apply that point's track width and gap to the cross-section controls.
 - User can see the assumptions and approximation limits that apply to the estimate.
 - User can use manual material inputs only in the initial version.
 - User can read linear measurements with metric and imperial values shown together in millimeters and mils.

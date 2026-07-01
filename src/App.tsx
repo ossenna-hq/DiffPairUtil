@@ -118,24 +118,6 @@ function App() {
     }
   }, [dimensionLocks, input, manualDimensionHolds, manualDimensions]);
 
-  const traceGapSeries = useMemo(() => {
-    if (configuration.signal !== "differential") {
-      return [];
-    }
-
-    return createTraceGapSeries({
-      ...input,
-      dielectricHeightMm:
-        estimate.value?.dielectricHeightMm ??
-        manualDimensions.dielectricHeightMm,
-    });
-  }, [
-    configuration.signal,
-    estimate.value?.dielectricHeightMm,
-    input,
-    manualDimensions.dielectricHeightMm,
-  ]);
-
   function updateNumber(field: keyof DifferentialPairInput, value: string) {
     setInput((current) => ({
       ...current,
@@ -173,6 +155,19 @@ function App() {
     }));
     setManualDimensions((current) => ({
       ...current,
+      gapMm: Math.max(0.001, nextGapMm),
+    }));
+  }
+
+  function updateTraceGap(nextTraceWidthMm: number, nextGapMm: number) {
+    setManualDimensionHolds((current) => ({
+      ...current,
+      traceWidth: true,
+      gap: true,
+    }));
+    setManualDimensions((current) => ({
+      ...current,
+      traceWidthMm: Math.max(0.001, nextTraceWidthMm),
       gapMm: Math.max(0.001, nextGapMm),
     }));
   }
@@ -234,6 +229,28 @@ function App() {
     input.targetDifferentialOhms,
     tolerancePercent,
   );
+  const traceGapSeries = useMemo(() => {
+    if (configuration.signal !== "differential") {
+      return [];
+    }
+
+    return createTraceGapSeries(
+      {
+        ...input,
+        dielectricHeightMm:
+          estimate.value?.dielectricHeightMm ??
+          manualDimensions.dielectricHeightMm,
+      },
+      estimate.value?.gapMm ?? manualDimensions.gapMm,
+    );
+  }, [
+    configuration.signal,
+    estimate.value?.dielectricHeightMm,
+    estimate.value?.gapMm,
+    input,
+    manualDimensions.dielectricHeightMm,
+    manualDimensions.gapMm,
+  ]);
 
   return (
     <main className="shell">
@@ -409,7 +426,6 @@ function App() {
                       <label>
                         <span>mm</span>
                         <input
-                          disabled={dimensionLocks.dielectricHeight}
                           min="0.05"
                           max="0.6"
                           step="0.001"
@@ -423,7 +439,6 @@ function App() {
                       <label>
                         <span>mil</span>
                         <input
-                          disabled={dimensionLocks.dielectricHeight}
                           min="2"
                           max="24"
                           step="0.1"
@@ -488,7 +503,6 @@ function App() {
                 <div className="vertical-stepper visual-thickness-stepper">
                   <button
                     aria-label="Decrease dielectric thickness"
-                    disabled={dimensionLocks.dielectricHeight}
                     type="button"
                     onClick={() =>
                       updateDielectricHeight(solvedDielectricHeightMm - 0.01)
@@ -503,7 +517,6 @@ function App() {
                     max="0.6"
                     step="0.01"
                     type="range"
-                    disabled={dimensionLocks.dielectricHeight}
                     value={solvedDielectricHeightMm}
                     onChange={(event) =>
                       updateDielectricHeight(Number(event.target.value))
@@ -511,7 +524,6 @@ function App() {
                   />
                   <button
                     aria-label="Increase dielectric thickness"
-                    disabled={dimensionLocks.dielectricHeight}
                     type="button"
                     onClick={() =>
                       updateDielectricHeight(solvedDielectricHeightMm + 0.01)
@@ -615,6 +627,7 @@ function App() {
             {configuration.signal === "differential" ? (
               <TraceGapChart
                 currentPoint={estimate.value}
+                onPointSelect={updateTraceGap}
                 points={traceGapSeries}
                 targetOhms={input.targetDifferentialOhms}
                 tolerancePercent={tolerancePercent}
@@ -728,7 +741,7 @@ function DimensionReadout({
           <label>
             <span>mm</span>
             <input
-              disabled={locked || valueMm === null}
+              disabled={valueMm === null}
               min="0.001"
               step="0.001"
               type="number"
@@ -739,7 +752,7 @@ function DimensionReadout({
           <label>
             <span>mil</span>
             <input
-              disabled={locked || valueMm === null}
+              disabled={valueMm === null}
               min="0.1"
               step="0.1"
               type="number"
@@ -950,6 +963,7 @@ function GeometryGraphic({
 
 interface TraceGapChartProps {
   currentPoint: ReturnType<typeof estimateDifferentialPair> | null;
+  onPointSelect: (traceWidthMm: number, gapMm: number) => void;
   points: TraceGapPoint[];
   targetOhms: number;
   tolerancePercent: number;
@@ -957,6 +971,7 @@ interface TraceGapChartProps {
 
 function TraceGapChart({
   currentPoint,
+  onPointSelect,
   points,
   targetOhms,
   tolerancePercent,
@@ -1057,19 +1072,28 @@ function TraceGapChart({
     .reverse()
     .join(" ");
   const bandPath = `${upperPath} ${lowerPath} Z`;
-  const activePoint = hoveredPoint ?? points[Math.floor(points.length / 2)];
-  const activeX = scale(activePoint.gapMm, minGap, maxGap, plotLeft, plotRight);
-  const activeY = scale(
-    activePoint.traceWidthMm,
-    minTrace,
-    maxTrace,
-    plotBottom,
-    plotTop,
-  );
+  const activeX = hoveredPoint
+    ? scale(hoveredPoint.gapMm, minGap, maxGap, plotLeft, plotRight)
+    : null;
+  const activeY = hoveredPoint
+    ? scale(hoveredPoint.traceWidthMm, minTrace, maxTrace, plotBottom, plotTop)
+    : null;
 
   function handleChartMove(event: MouseEvent<SVGSVGElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
     const xInSvg = ((event.clientX - bounds.left) / bounds.width) * width;
+    const yInSvg = ((event.clientY - bounds.top) / bounds.height) * height;
+
+    if (
+      xInSvg < plotLeft ||
+      xInSvg > plotRight ||
+      yInSvg < plotTop ||
+      yInSvg > plotBottom
+    ) {
+      setHoveredPoint(null);
+      return;
+    }
+
     const nearest = points.reduce((best, point) => {
       const pointX = scale(point.gapMm, minGap, maxGap, plotLeft, plotRight);
       const bestX = scale(best.gapMm, minGap, maxGap, plotLeft, plotRight);
@@ -1156,25 +1180,35 @@ function TraceGapChart({
               className="chart-dot"
               cx={x}
               cy={y}
+              onClick={() => onPointSelect(point.traceWidthMm, point.gapMm)}
               r="3.5"
             />
           );
         })}
-        <line
-          className="crosshair"
-          x1={activeX}
-          y1={plotTop}
-          x2={activeX}
-          y2={plotBottom}
-        />
-        <line
-          className="crosshair"
-          x1={plotLeft}
-          y1={activeY}
-          x2={plotRight}
-          y2={activeY}
-        />
-        <circle className="chart-active-dot" cx={activeX} cy={activeY} r="6" />
+        {hoveredPoint && activeX !== null && activeY !== null ? (
+          <>
+            <line
+              className="crosshair"
+              x1={activeX}
+              y1={plotTop}
+              x2={activeX}
+              y2={plotBottom}
+            />
+            <line
+              className="crosshair"
+              x1={plotLeft}
+              y1={activeY}
+              x2={plotRight}
+              y2={activeY}
+            />
+            <circle
+              className="chart-active-dot"
+              cx={activeX}
+              cy={activeY}
+              r="6"
+            />
+          </>
+        ) : null}
         {currentPoint && currentPointX !== null && currentPointY !== null ? (
           <circle
             className={
@@ -1194,27 +1228,29 @@ function TraceGapChart({
             </title>
           </circle>
         ) : null}
-        <g
-          transform={`translate(${Math.min(activeX + 14, width - 190)} ${Math.max(activeY - 58, 18)})`}
-        >
-          <rect
-            className="chart-tooltip"
-            width="170"
-            height={tolerancePercent > 0 ? "66" : "48"}
-            rx="7"
-          />
-          <text className="chart-tooltip-text" x="10" y="19">
-            gap {formatMmMil(activePoint.gapMm)}
-          </text>
-          <text className="chart-tooltip-text" x="10" y="37">
-            width {formatMmMil(activePoint.traceWidthMm)}
-          </text>
-          {tolerancePercent > 0 ? (
-            <text className="chart-tooltip-text subtle" x="10" y="55">
-              band +/- {tolerancePercent}%
+        {hoveredPoint && activeX !== null && activeY !== null ? (
+          <g
+            transform={`translate(${Math.min(activeX + 14, width - 190)} ${Math.max(activeY - 58, 18)})`}
+          >
+            <rect
+              className="chart-tooltip"
+              width="170"
+              height={tolerancePercent > 0 ? "66" : "48"}
+              rx="7"
+            />
+            <text className="chart-tooltip-text" x="10" y="19">
+              gap {formatMmMil(hoveredPoint.gapMm)}
             </text>
-          ) : null}
-        </g>
+            <text className="chart-tooltip-text" x="10" y="37">
+              width {formatMmMil(hoveredPoint.traceWidthMm)}
+            </text>
+            {tolerancePercent > 0 ? (
+              <text className="chart-tooltip-text subtle" x="10" y="55">
+                band +/- {tolerancePercent}%
+              </text>
+            ) : null}
+          </g>
+        ) : null}
         <text
           className="chart-label"
           x={width / 2}
@@ -1256,11 +1292,19 @@ function TraceGapChart({
   );
 }
 
-function createTraceGapSeries(input: DifferentialPairInput): TraceGapPoint[] {
-  const minimumGap = Math.max(0.05, input.dielectricHeightMm * 0.35);
+function createTraceGapSeries(
+  input: DifferentialPairInput,
+  currentGapMm: number,
+): TraceGapPoint[] {
+  const defaultMinimumGap = Math.max(0.05, input.dielectricHeightMm * 0.35);
+  const minimumGap = Math.max(
+    0.001,
+    Math.min(defaultMinimumGap, currentGapMm * 0.75),
+  );
   const maximumGap = Math.max(
     minimumGap + 0.12,
     input.dielectricHeightMm * 3.2,
+    currentGapMm * 1.2,
   );
   const steps = 13;
   const points: TraceGapPoint[] = [];
